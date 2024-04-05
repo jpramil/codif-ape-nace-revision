@@ -19,59 +19,45 @@ def get_filesystem():
     return fs
 
 
-def extract_otm_cases(
-    df: pd.DataFrame,
-):
-    subset = df.copy()
-    subset["surface"] = subset["surface"].apply(reclassify_surface)
-    return subset[["text_description", "type_", "nature", "surface", "event"]]
-
-
 def save_to_s3(table: pa.Table, bucket: str, path: str):
     fs = get_filesystem()
     # To partition data
     pq.write_to_dataset(
         table,
         root_path=f"s3://{bucket}/{path}/",
-        partition_cols=["date"],
+        partition_cols=["apet_finale"],
         basename_template="part-{i}.parquet",
         existing_data_behavior="overwrite_or_ignore",
         filesystem=fs,
     )
 
 
-def main(data_file_path: str, dashboard_path: str, api_path: str):  # , date_to_log: str):
+def main(data_file_path: str, dashboard_path: str):  # , date_to_log: str):
     # Define file system
     fs = get_filesystem()
 
     # Open Dataset
     data = (
         ds.dataset(
-            f"{data_file_path}/test_data_NAF2008.parquet",
-            # partitioning=["date"],
+            f"{data_file_path}/20240403_multivoque_sans_01F_sirene4.parquet",
             format="parquet",
             filesystem=fs,
         )
         .to_table()
-        # .filter(
-        #     (ds.field("date") == f"date={date_to_log}")
-        # )
         .to_pandas()
     )
 
     # Harmonize dataset for the query
     table = format_query(data)
-    results = query_batch_api(table, api_path, prob_min=0.0)
     table = add_prediction_columns(data, results)
     # Remove 'date=' prefix from the 'date' column to partition again
-    table["date"] = table["date"].str.replace("date=", "")
+    table["APE"] = table["date"].str.replace("date=", "")
     arrow_table = pa.Table.from_pandas(table)
     save_to_s3(arrow_table, "projet-ape", f"{dashboard_path}")
 
 
 if __name__ == "__main__":
-    data_file_path = str(sys.argv[1])
-    dashboard_path = str(sys.argv[2])
-    api_path = str(sys.argv[3])
+    data_file_path = "NAF-revision/extractions/otm-establishment-level"# str(sys.argv[1])
+    dashboard_path = "NAF-revision/APE-partitions"#str(sys.argv[2])
 
-    main(data_file_path, dashboard_path, api_path)
+    main(data_file_path, dashboard_path)
