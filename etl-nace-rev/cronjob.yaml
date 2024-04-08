@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: etl-monitoring-test
+  name: etl-nace-rev
 spec:
   schedule: "0 3 * * *"
   jobTemplate:
@@ -9,7 +9,7 @@ spec:
       template:
         spec:
           containers:
-          - name: etl-monitoring
+          - name: etl-nace-rev
             image: inseefrlab/onyxia-python-datascience:py3.10.9
             imagePullPolicy: IfNotPresent
             command:
