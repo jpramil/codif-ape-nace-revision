@@ -1,0 +1,47 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: etl-monitoring-test
+spec:
+  schedule: "0 3 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: etl-monitoring
+            image: inseefrlab/onyxia-python-datascience:py3.10.9
+            imagePullPolicy: IfNotPresent
+            command:
+              - /bin/sh
+              - -c
+              - | 
+                cd /tmp &&
+                wget https://raw.githubusercontent.com/InseeFrLab/codif-ape-nace_revision/main/utils/partition_otm_nace.py &&
+                wget https://raw.githubusercontent.com/InseeFrLab/codif-ape-API/main/utils/textual_similarity_clustering.py &&
+                wget https://raw.githubusercontent.com/InseeFrLab/codif-ape-API/main/utils/partition_sampling.py &&
+                wget https://raw.githubusercontent.com/InseeFrLab/codif-ape-API/main/utils/optimize_NAF_2025_annotation.sh &&
+                chmod +x optimize_NAF_2025_annotation.sh &&
+                ./optimize_NAF_2025_annotation.sh
+            volumeMounts:
+              - name: tmp
+                mountPath: "/tmp"
+            envFrom:
+              - configMapRef:
+                  name: configmap-etl-nace-rev
+            env:
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: my-s3-creds
+                  key: accessKey
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: my-s3-creds
+                  key: secretKey
+          restartPolicy: Never
+          serviceAccountName: etl-nace-rev
+          volumes:
+          - name: tmp
+            emptyDir: {}

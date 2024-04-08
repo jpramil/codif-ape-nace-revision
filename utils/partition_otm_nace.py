@@ -32,14 +32,19 @@ def save_to_s3(table: pa.Table, bucket: str, path: str):
     )
 
 
-def main(data_file_path: str, dashboard_path: str):  # , date_to_log: str):
+def main(data_file_path: str, partition_path: str):  # , date_to_log: str):
     # Define file system
     fs = get_filesystem()
-
+    # List all the files in the prefix folder
+    files = fs.ls(data_file_path)
+    # Sort the files based on their modification time (last modified first)
+    files_sorted = sorted(files, key=lambda x: fs.info(x)['LastModified'], reverse=True)
+    # Get the last file in the sorted list
+    last_file = files_sorted[0]
     # Open Dataset
     data = (
         ds.dataset(
-            f"{data_file_path}/20240403_multivoque_sans_01F_sirene4.parquet",
+            f"{last_file}",
             format="parquet",
             filesystem=fs,
         )
@@ -47,17 +52,11 @@ def main(data_file_path: str, dashboard_path: str):  # , date_to_log: str):
         .to_pandas()
     )
 
-    # Harmonize dataset for the query
-    table = format_query(data)
-    table = add_prediction_columns(data, results)
-    # Remove 'date=' prefix from the 'date' column to partition again
-    table["APE"] = table["date"].str.replace("date=", "")
-    arrow_table = pa.Table.from_pandas(table)
-    save_to_s3(arrow_table, "projet-ape", f"{dashboard_path}")
+    arrow_table = pa.Table.from_pandas(data)
+    save_to_s3(arrow_table, "projet-ape", f"{partition_path}")
 
 
 if __name__ == "__main__":
-    data_file_path = "NAF-revision/extractions/otm-establishment-level"# str(sys.argv[1])
-    dashboard_path = "NAF-revision/APE-partitions"#str(sys.argv[2])
-
-    main(data_file_path, dashboard_path)
+    data_file_path = str(sys.argv[1]) # "projet-ape/NAF-revision/extractions/one-to-many"
+    partition_path = str(sys.argv[2]) # "NAF-revision/APE-partitions"
+    main(data_file_path, partition_path)
