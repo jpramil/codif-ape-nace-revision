@@ -71,15 +71,15 @@ cosine_sim_matrix = cosine_similarity(vectors)
 print(cosine_sim_matrix)
 
 # Clustering avec HDBSCAN
-#clusterer = hdbscan.HDBSCAN(metric='precomputed', min_cluster_size=2, min_samples=1)
-#cluster_labels = clusterer.fit_predict(1 - cosine_sim_matrix)
+clusterer = hdbscan.HDBSCAN(metric='precomputed', min_cluster_size=2, min_samples=1)
+cluster_labels = clusterer.fit_predict(1 - cosine_sim_matrix)
 
 # Définition du seuil de similarité pour DBSCAN
-epsilon = 0.95  # À ajuster en fonction de votre cas d'utilisation
+#epsilon = 0.95  # À ajuster en fonction de votre cas d'utilisation
 
 # Clustering avec DBSCAN
-dbscan = DBSCAN(eps=epsilon, min_samples=2, metric='precomputed')
-cluster_labels = dbscan.fit_predict(1 - cosine_sim_matrix)
+#dbscan = DBSCAN(eps=epsilon, min_samples=2, metric='precomputed')
+#cluster_labels = dbscan.fit_predict(1 - cosine_sim_matrix)
 
 df['groupe'] = cluster_labels
 print(df["groupe"].value_counts())
@@ -108,6 +108,7 @@ print(df[df["groupe"]=="500"]["texte"])
 #output_file = 'path/to/your/output.parquet'
 #representants.to_parquet(output_file, index=False)
 
+df.to_csv('similarity_fasttext.csv')
 
 # Fonction pour filtrer les clusters basés sur la distance de Levenshtein
 def is_text_variants(group, threshold=2):
