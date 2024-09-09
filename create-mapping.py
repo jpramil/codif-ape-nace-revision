@@ -33,7 +33,7 @@ mapping = {
 }
 
 notes_ex["Code.NACE.Rev.2.1"] = notes_ex["Code.NACE.Rev.2.1"].str.replace(".", "", regex=False)
-notes_ex = notes_ex.iloc[:, [6, 9, 10, 11, 12, 13]].rename(
+notes_ex = notes_ex.iloc[:, [6, 9, 10, 11, 12, 13, 7, 8]].rename(
     columns={
         "Code.NACE.Rev.2.1": "naf08_niv4",
         "Titre": "lib_naf08_niv5",
@@ -53,8 +53,11 @@ for code08 in mapping.keys():
         if row.empty:
             row = notes_ex.loc[notes_ex["naf08_niv4"] == code25[:-1]]
             if row.shape[0] != 1:
-                print(f"PROBLEM WITH {code25}")
-                continue
+                row = notes_ex.loc[
+                    (notes_ex["naf08_niv4"] == code25[:-1]) & (notes_ex["indic.NAF"] == "1")
+                ]
+                if row.shape[0] != 1:
+                    raise ValueError(f"Could not find notes for {code25}")
 
         notes = normalize_value(row.notes.iloc[0])
         comprend = normalize_value(row.Comprend.iloc[0])
