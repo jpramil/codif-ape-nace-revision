@@ -4,3 +4,5 @@ hdbscan
 nltk
 Levenshtein
 fuzzywuzzy
+ruff==0.6.4
+pre-commit==3.8.0
