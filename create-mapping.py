@@ -7,6 +7,47 @@ def normalize_value(value):
     return unicodedata.normalize("NFKC", value) if pd.notna(value) else None
 
 
+def generate_prompt(mapping: dict, code_naf08: str, activite: str) -> str:
+    """
+    Generate a prompt for the classification task based on the NACE statistical nomenclature.
+
+    Args:
+        mapping (dict): A dictionary mapping NAF08 codes to NAF25 codes.
+        code_naf08 (str): The NAF08 code of the company.
+        activite (str): The activity of the company.
+
+    Returns:
+        str: The NAF25 code of the company.
+    """
+
+    notes_explicatives = [
+        f"""
+        {i}. Code NACE : {code}
+
+        * Libellé du code : {details["libelle"]}
+
+        * {details["comprend"]}
+
+        * {details["comprend_pas"]}
+        """
+        for i, (code, details) in enumerate(mapping[code_naf08]["naf25"].items(), start=1)
+    ]
+
+    PROMPT = f"""
+    Voici une tâche de classification basée sur la nomenclature statistique NACE. Votre objectif est d'analyser l'activité d'une entreprise décrite ci-dessous et de choisir, parmi une liste de codes potentiels, celui qui correspond le mieux à cette activité. Chaque code est accompagné de notes explicatives précisant les activités couvertes et celles exclues.
+
+    Activité de l'entreprise :
+    {activite}
+
+    Liste des codes NACE potentiels et leurs notes explicatives :
+    {"\n".join(notes_explicatives)}
+
+
+    Votre tâche est de choisir le code NACE qui correspond le plus précisément à l'activité de l'entreprise en vous basant sur les notes explicatives. Répondez uniquement avec le code NACE sélectionné, sans explication supplémentaire, parmi la liste des codes suivants : {", ".join(mapping[code_naf08]["naf25"].keys())}
+    """
+    return PROMPT
+
+
 table_corres = pd.read_excel("table-correspondance-naf2025.xls", dtype=str)
 notes_ex = pd.read_excel("notes-explicatives-naf2025.xlsx", dtype=str)
 
@@ -112,4 +153,21 @@ con.execute(
 """
 )
 
+
+data_multivoques = con.query(
+    f"""
+    SELECT
+        *
+    FROM
+        read_parquet('{URL}')
+    WHERE
+        apet_finale IN ('{"', '".join(multivoques)}')
+;
+"""
+).to_df()
+
 con.close()
+
+row = data_multivoques.loc[25424, :]
+
+print(generate_prompt(mapping, row.apet_finale, row.libelle_activite))
