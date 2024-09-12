@@ -248,17 +248,17 @@ tokenizer, model = get_model(model_name, device=device)
 data = data_multivoques
 
 results = []
-for row in tqdm(data.itertuples()):
+for row in tqdm(data.itertuples(), total=data.shape[0]):
     # Generate the prompt and append the eos_token (end of sequence marker)
     prompt = (
         f"{generate_prompt(mapping, row.apet_finale, row.libelle_activite, include_notes=False)}"
     )
     prompt += tokenizer.eos_token
 
-    # Tokenize the input and move it to the device (GPU)
+    # Tokenize the input
     inputs = tokenizer(prompt, return_tensors="pt").to(device)
 
-    # Generate the output from the model with eos_token_id marked
+    # Generate the output
     outputs = model.generate(
         **inputs,
         max_new_tokens=10,
@@ -269,7 +269,7 @@ for row in tqdm(data.itertuples()):
         eos_token_id=tokenizer.eos_token_id,
     )
 
-    # Decode the generated output, skipping special tokens
+    # Decode the generated output
     response = tokenizer.decode(outputs[0][-4:], skip_special_tokens=True)
 
     # Make sure the predicted code is from the list of potential code
