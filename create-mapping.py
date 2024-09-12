@@ -52,7 +52,7 @@ table_corres = pd.read_excel("table-correspondance-naf2025.xls", dtype=str)
 notes_ex = pd.read_excel("notes-explicatives-naf2025.xlsx", dtype=str)
 
 URL = "s3://projet-ape/extractions/20240812_sirene4.parquet"
-URL_OUT = "s3://projet-ape/extractions/20240812_sirene4_univoques.parquet"
+URL_OUT = "s3://projet-ape/NAF-revision/relabeled-data/20240812_sirene4_univoques.parquet"
 
 table_corres = (
     table_corres.iloc[:, [1, 3, 2, 10, 5, 11]]
