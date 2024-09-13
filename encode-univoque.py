@@ -2,6 +2,7 @@ import pandas as pd
 import duckdb
 from src.utils.data import get_file_system
 from src.mappings.mappings import create_mapping
+import os
 
 
 def encore_univoque(
@@ -50,6 +51,11 @@ def encore_univoque(
 
     # SQL query with renamed column and new column using CASE for mapping
     query = f"""
+        SET s3_endpoint='{os.getenv("AWS_S3_ENDPOINT")}';
+        SET s3_access_key_id='{os.getenv("AWS_ACCESS_KEY_ID")}';
+        SET s3_secret_access_key='{os.getenv("AWS_SECRET_ACCESS_KEY")}';
+        SET s3_session_token='';
+
         SELECT
             *,
             apet_finale AS code_naf08,
