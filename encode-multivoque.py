@@ -19,8 +19,11 @@ def encore_multivoque(
     fs = get_file_system()
 
     # Load excel files containing informations about mapping
-    table_corres = pd.read_excel("table-correspondance-naf2025.xls", dtype=str, filesystem=fs)
-    notes_ex = pd.read_excel("notes-explicatives-naf2025.xlsx", dtype=str, filesystem=fs)
+    with fs.open("s3://projet-ape/NAF-revision/table-correspondance-naf2025.xls") as f:
+        table_corres = pd.read_excel(f, dtype=str)
+
+    with fs.open("s3://projet-ape/NAF-revision/notes-explicatives-naf2025.xlsx") as f:
+        notes_ex = pd.read_excel(f, dtype=str)
 
     mapping = create_mapping(table_corres, notes_ex)
 
