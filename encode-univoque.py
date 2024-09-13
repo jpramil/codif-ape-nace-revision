@@ -8,6 +8,24 @@ def encore_univoque(
     url_source: str,
     url_out: str,
 ):
+    """
+    Processes the NAF code mappings and relabels the source dataset with new NAF codes (2025 version)
+    for rows with unambiguous mappings (univoque codes), then outputs the result as a Parquet file.
+
+    Parameters:
+    -----------
+    url_source : str
+        The S3 URL of the source dataset in Parquet format to be relabeled.
+
+    url_out : str
+        The S3 URL where the relabeled output dataset will be saved as a Parquet file.
+
+    Returns:
+    --------
+    None
+        The function writes the relabeled dataset to the specified output location.
+    """
+
     fs = get_file_system()
 
     # Load excel files containing informations about mapping

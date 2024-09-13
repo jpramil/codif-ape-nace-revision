@@ -16,6 +16,24 @@ def encore_multivoque(
     model_name: str,
     device: str = "cuda",
 ):
+    """
+    Processes multivoque (ambiguous) NAF codes from a source dataset and relabels them using a language model.
+
+    Parameters:
+    -----------
+    url_source : str
+        The S3 URL of the source dataset in Parquet format to be processed.
+
+    url_out : str
+        The S3 URL where the relabeled output dataset will be saved as a Parquet file.
+
+    model_name : str
+        The name or path of the language model to be used for generating predictions.
+
+    device : str, optional, default="cuda"
+        The device on which to run the model (e.g., 'cuda' for GPU, 'cpu' for CPU).
+    """
+
     fs = get_file_system()
 
     # Load excel files containing informations about mapping
