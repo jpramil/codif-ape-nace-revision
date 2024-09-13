@@ -51,11 +51,6 @@ def encore_univoque(
 
     # SQL query with renamed column and new column using CASE for mapping
     query = f"""
-        SET s3_endpoint='{os.getenv("AWS_S3_ENDPOINT")}';
-        SET s3_access_key_id='{os.getenv("AWS_ACCESS_KEY_ID")}';
-        SET s3_secret_access_key='{os.getenv("AWS_SECRET_ACCESS_KEY")}';
-        SET s3_session_token='';
-
         SELECT
             *,
             apet_finale AS code_naf08,
@@ -68,6 +63,11 @@ def encore_univoque(
 
     con.execute(
         f"""
+        SET s3_endpoint='{os.getenv("AWS_S3_ENDPOINT")}';
+        SET s3_access_key_id='{os.getenv("AWS_ACCESS_KEY_ID")}';
+        SET s3_secret_access_key='{os.getenv("AWS_SECRET_ACCESS_KEY")}';
+        SET s3_session_token='';
+
         COPY
         ({query})
         TO '{url_out}'
