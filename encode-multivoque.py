@@ -90,7 +90,7 @@ def encore_multivoque(
     tokenizer.pad_token = tokenizer.eos_token
 
     results = []
-    for row in tqdm(data.loc[:10, :].itertuples(), total=data.shape[0]):
+    for row in tqdm(data.itertuples(), total=data.shape[0]):
         # Generate the prompt and append the eos_token (end of sequence marker)
         prompt = f"{generate_prompt(mapping, row.apet_finale, row.libelle_activite, include_notes=False)}"
         prompt += tokenizer.eos_token

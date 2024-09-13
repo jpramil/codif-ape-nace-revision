@@ -1,0 +1,63 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: run-relabel-naf08-to-naf25
+spec:
+  serviceAccountName: workflow
+  volumes:
+    - name: dshm
+      emptyDir:
+        medium: Memory
+        sizeLimit: 64Gi
+  entrypoint: main
+
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: relabel-naf08-to-naf25
+            template: run-relabel
+
+    # Worker templat
+    - name: run-relabel
+      nodeSelector:
+        nvidia.com/gpu.product: "NVIDIA-H100-PCIe"
+      container:
+        image: inseefrlab/onyxia-vscode-pytorch:py3.12.4-gpu
+        imagePullPolicy: Always
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+        command: ["/bin/bash", -c]
+        args:
+          - |
+            git clone https://github.com/InseeFrLab/codif-ape-nace-revision.git &&
+            cd codif-ape-nace-revision/ &&
+            pip install -r requirements.txt &&
+            python encode-univoque.py &&
+            python encode-multivoque.py
+
+        volumeMounts:
+          - mountPath: /dev/shm
+            name: dshm
+        env:
+          # env var for s3 connexion
+          - name: AWS_ACCESS_KEY_ID
+            valueFrom:
+              secretKeyRef:
+                name: my-s3-creds
+                key: accessKey
+          - name: AWS_SECRET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                name: my-s3-creds
+                key: secretKey
+          - name: AWS_DEFAULT_REGION
+            value: us-east-1
+          - name: AWS_S3_ENDPOINT
+            value: minio.lab.sspcloud.fr
+          - name: HF_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: hf-token
+                key: token
