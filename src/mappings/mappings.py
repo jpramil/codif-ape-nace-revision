@@ -2,38 +2,29 @@ import unicodedata
 import pandas as pd
 
 
-def normalize_value(value):
-    return unicodedata.normalize("NFKC", value) if pd.notna(value) else None
+class NAF2008:
+    def __init__(self, code, label, naf2025=None):
+        self.code = code
+        self.label = label
+        self.naf2025 = naf2025 if naf2025 else []
+
+    def __repr__(self):
+        return f"NAF2008(code={self.code}, label={self.label}, naf2025={self.naf2025})"
 
 
-def create_mapping(mapping_table: pd.DataFrame, explanatory_notes: pd.DataFrame) -> dict:
-    """
-    Processes the provided `mapping_table` and `explanatory_notes` DataFrames to create a
-    hierarchical mapping between NAF 2008 and NAF 2025 codes, and enriches the mapping
-    with additional explanatory notes.
+class NAF2025:
+    def __init__(self, code, label, include, not_include, notes=None):
+        self.code = code
+        self.label = label
+        self.include = include
+        self.not_include = not_include
+        self.notes = notes
 
-    Parameters:
-    ----------
-    mapping_table : pd.DataFrame
-        The DataFrame containing the correspondence between old and new NAF codes.
-        Expected columns are: NAF 2008 codes, NAF 2025 codes, and their descriptions.
+    def __repr__(self):
+        return f"NAF2025(code={self.code}, label={self.label}, include={self.include}, not_include={self.not_include}, notes={self.notes})"
 
-    explanatory_notes : pd.DataFrame
-        The DataFrame containing explanatory notes for the NAF codes, including
-        general notes, what the code comprises, and what it does not comprise.
 
-    Returns:
-    -------
-    mapping : dict
-        A nested dictionary mapping NAF 2008 codes (`naf08_niv5`) to:
-        - "libelle" : The description of the NAF 2008 code.
-        - "naf25" : A dictionary mapping NAF 2025 codes (`naf25_niv5`) to:
-            - "libelle" : The description of the NAF 2025 code.
-            - "notes" : General notes on the NAF 2025 code.
-            - "comprend" : What the NAF 2025 code includes.
-            - "comprend_pas" : What the NAF 2025 code does not include.
-    """
-
+def format_mapping_table(mapping_table: str) -> str:
     columns_mapping = {
         "NAFold-code\n(code niveau sous-classe de la nomenclature actuelle)": "naf08_niv5",
         "NACEold-code\n(niveau classe)": "naf08_niv4",
@@ -43,7 +34,7 @@ def create_mapping(mapping_table: pd.DataFrame, explanatory_notes: pd.DataFrame)
         "NAFnew-intitulé\n(niveau sous-classe)": "lib_naf25_niv5",
     }
 
-    mapping_table = (
+    return (
         mapping_table.iloc[:, [1, 3, 2, 10, 5, 11]]
         .rename(columns=columns_mapping)
         .assign(
@@ -52,20 +43,12 @@ def create_mapping(mapping_table: pd.DataFrame, explanatory_notes: pd.DataFrame)
             naf25_niv4=mapping_table.iloc[:, 5].str.replace(".", "", regex=False),
             naf25_niv5=mapping_table.iloc[:, 10].str.replace(".", "", regex=False),
         )
+        .copy()
     )
 
-    mapping = {
-        code08: {
-            "libelle": subset["lib_naf08_niv5"].iloc[0],
-            "naf25": {
-                row["naf25_niv5"]: {"libelle": row["lib_naf25_niv5"]}
-                for _, row in subset.iterrows()
-            },
-        }
-        for code08, subset in mapping_table.groupby("naf08_niv5")
-    }
 
-    explanatory_notes = (
+def format_explanatory_notes(explanatory_notes: str) -> str:
+    return (
         explanatory_notes.iloc[:, [6, 9, 10, 11, 12, 13, 7, 8]]
         .rename(
             columns={
@@ -77,43 +60,107 @@ def create_mapping(mapping_table: pd.DataFrame, explanatory_notes: pd.DataFrame)
         .assign(naf08_niv4=explanatory_notes["Code.NACE.Rev.2.1"].str.replace(".", "", regex=False))
     )
 
-    # Filling `mapping` with notes information
-    for code08, code08_data in mapping.items():
-        for code25, code25_data in code08_data["naf25"].items():
-            # Attempt to find level 5 naf code in explanatory_notes
-            row = explanatory_notes.loc[explanatory_notes["naf08_niv4"] == code25]
 
-            # If doesn't exist, try to find level 4 naf code in explanatory_notes
-            if row.empty:
-                row = explanatory_notes.loc[explanatory_notes["naf08_niv4"] == code25[:-1]]
-                if row.shape[0] != 1:
-                    row = explanatory_notes.loc[
-                        (explanatory_notes["naf08_niv4"] == code25[:-1])
-                        & (explanatory_notes["indic.NAF"] == "1")
-                    ]
-                    if row.shape[0] != 1:
-                        raise ValueError(f"Could not find notes for {code25}")
+def find_explanatory_notes(explanatory_notes: pd.DataFrame, code25: str, naf_code_column: str = "naf08_niv4") -> pd.Series:
+    """
+    Finds the explanatory notes for a given NAF 2025 code by looking it up in the explanatory_notes DataFrame.
+    The function first searches for the full code and progressively attempts to find related codes if no match is found.
 
-            # Extract relevant fields and normalize values
-            notes = normalize_value(row["notes"].iloc[0])
-            comprend = normalize_value(row["Comprend"].iloc[0])
-            comprend_aussi = normalize_value(row["Comprend.aussi"].iloc[0])
-            comprend_pas = normalize_value(row["Ne.comprend.pas"].iloc[0])
+    Parameters:
+    ----------
+    explanatory_notes : pd.DataFrame
+        The DataFrame containing the explanatory notes for NAF codes, with columns for NAF codes, general notes,
+        what the code comprises, and what it does not comprise.
 
-            # Combine 'comprend' and 'comprend_aussi' if they exist
-            comprend_all = (
-                "\n".join(filter(None, [comprend, comprend_aussi]))
-                if comprend or comprend_aussi
-                else None
-            )
+    code25 : str
+        The NAF 2025 code to find explanatory notes for.
 
-            # Update the `mapping` dictionary with the new information
-            mapping[code08]["naf25"][code25].update(
-                {
-                    "notes": notes,
-                    "comprend": comprend_all,
-                    "comprend_pas": comprend_pas,
-                }
-            )
+    naf_code_column : str, optional
+        The name of the column in explanatory_notes where the NAF code is stored. Default is 'naf08_niv4'.
 
-    return mapping
+    Returns:
+    -------
+    row : pd.Series
+        A row from the explanatory_notes DataFrame containing the notes for the NAF code.
+
+    """
+
+    explanatory_notes = format_explanatory_notes(explanatory_notes)
+
+    # Attempt to find level 5 naf code in explanatory_notes
+    row = explanatory_notes.loc[explanatory_notes[naf_code_column] == code25]
+
+    # If doesn't exist, try to find level 4 naf code in explanatory_notes (remove the last character)
+    if row.empty:
+        row = explanatory_notes.loc[explanatory_notes[naf_code_column] == code25[:-1]]
+        
+        # If multiple or no matches, further filter based on 'indic.NAF' (or other criteria)
+        if row.shape[0] != 1:
+            row = explanatory_notes.loc[
+                (explanatory_notes[naf_code_column] == code25[:-1])
+                & (explanatory_notes["indic.NAF"] == "1")
+            ]
+            if row.shape[0] != 1:
+                raise ValueError(f"Could not find notes for {code25}")
+
+    return row.iloc[0]
+
+
+def get_explanatory_notes(explanatory_notes: pd.DataFrame, code25: str, note_type: str) -> str:
+    """
+    Retrieves explanatory notes of a specific type ('include', 'not_include', or 'notes') for a given NAF 2025 code.
+
+    Parameters:
+    ----------
+    explanatory_notes : pd.DataFrame
+        DataFrame containing the explanatory notes for NAF codes.
+
+    code25 : str
+        NAF 2025 code to look up the explanatory notes.
+
+    note_type : str
+        Type of explanatory note to retrieve. Can be 'include', 'not_include', or 'notes'.
+
+    Returns:
+    -------
+    str
+        The corresponding explanatory note for the given NAF code and note type, or None if no note exists.
+    """
+    # Lookup the row for the given NAF 2025 code
+    row = find_explanatory_notes(explanatory_notes, code25)
+
+    # Map note_type to corresponding columns
+    note_mapping = {
+        "include": ["Comprend", "Comprend.aussi"],
+        "not_include": ["Ne.comprend.pas"],
+        "notes": ["notes"]
+    }
+
+    if note_type not in note_mapping:
+        raise ValueError(f"Invalid note_type '{note_type}'. Must be 'include', 'not_include', or 'notes'.")
+
+    # Extract the relevant fields for the note_type
+    columns = note_mapping[note_type]
+    extracted_values = [unicodedata.normalize("NFKC", row[col]) for col in columns if col in row and pd.notnull(row[col])]
+
+    # Combine relevant fields for 'include' or return the value for 'not_include' and 'notes'
+    if extracted_values:
+        return "\n".join(extracted_values) if note_type == "include" else extracted_values[0]
+
+
+def get_mapping(explanatory_notes: pd.DataFrame, mapping_table: pd.DataFrame) -> list:
+    """
+    Generates a mapping of NAF 2008 codes to NAF 2025 codes with explanatory notes.
+    """
+    mapping_table = format_mapping_table(mapping_table)
+    return [NAF2008(
+        code=code08,
+        label=subset["lib_naf08_niv5"].iloc[0],
+        naf2025=[NAF2025(
+            code=row.naf25_niv5,
+            label=row.lib_naf25_niv5,
+            include=get_explanatory_notes(explanatory_notes, row.naf25_niv5, "notes"),
+            not_include=get_explanatory_notes(explanatory_notes, row.naf25_niv5, "not_include"),
+            notes=get_explanatory_notes(explanatory_notes, row.naf25_niv5, "notes")
+        ) for row in subset.itertuples()]
+    ) for code08, subset in mapping_table.groupby("naf08_niv5")]

@@ -1,39 +1,48 @@
-def generate_prompt(
-    mapping: dict, code_naf08: str, activite: str, include_notes: bool = True
-) -> str:
-    """
-    Generate a prompt for the classification task based on the NACE statistical nomenclature.
+SYS_PROMPT = """You are an expert in the NACE. Your goal is:
 
-    Args:
-        mapping (dict): A dictionary mapping NAF08 codes to NAF25 codes.
-        code_naf08 (str): The NAF08 code of the company.
-        activite (str): The activity of the company.
-        include_notes (bool) : Whether including explicative notes or not.
-
-    Returns:
-        str: The NAF25 code of the company.
-    """
-
-    notes_explicatives = [
-        f"""\
-        {i}. Code NACE : {code}
-
-        * Libellé du code : {details["libelle"]}\
-
-        {f"*  {details["comprend"]} \n\n  * {details["comprend_pas"]}" if include_notes else ""}
-        """
-        for i, (code, details) in enumerate(mapping[code_naf08]["naf25"].items(), start=1)
-    ]
-
-    PROMPT = f"""\
-Voici une tâche de classification basée sur la nomenclature statistique NACE. Votre objectif est d'analyser l'activité d'une entreprise décrite ci-dessous et de choisir, parmi une liste de codes potentiels, celui qui correspond le mieux à cette activité. Chaque code est accompagné de notes explicatives précisant les activités couvertes et celles exclues.
-
-Activité de l'entreprise :
-{activite}
-
-Liste des codes NACE potentiels et leurs notes explicatives :
-{"\n".join(notes_explicatives)}
-
-Votre tâche est de choisir le code NACE qui correspond le plus précisément à l'activité de l'entreprise en vous basant sur les notes explicatives. Répondez uniquement avec le code NACE sélectionné, sans explication supplémentaire, parmi la liste des codes suivants : {", ".join(mapping[code_naf08]["naf25"].keys())}. Si aucun des codes de la liste ne vous semble correct répondez "ERREUR"\
+1. Analyze the job title and job description provided by the user.
+2. From the list of occupational categories provided, identify the most appropriate ISCO code (4 digits) based on the job description. If the job description is not clear, use the job title to classify the job.
+3. Return the 4-digit code in JSON format as specified by the user. If the job cannot be classified within the given categories, return `null` in the JSON.
 """
-    return PROMPT
+
+CLASSIF_PROMPT = """\
+- Activité de l'entreprise :
+{activity}
+
+- Liste des codes NACE potentiels et leurs notes explicatives :
+{proposed_codes}
+
+{format_instructions}
+"""
+
+
+def format_codes(codes: list):
+    return "\n\n".join(
+        [
+            f"{nace2025.code}: {nace2025.label}\n{extract_info(nace2025, paragraphs=["include", "not_include", "notes"])}"
+            for nace2025 in codes
+        ]
+    )
+    
+
+def extract_info(nace2025, paragraphs=["include", "not_include", "notes"]):
+    info = [getattr(nace2025, paragraph) for paragraph in paragraphs if getattr(nace2025, paragraph) is not None]
+    return "\n\n".join(info) if info else ""
+
+
+def generate_prompt(row, mapping, parser):
+    nace08 = row.apet_finale
+    activity = row.libelle_activite
+
+    proposed_codes = next((m.naf2025 for m in mapping if m.code == nace08))
+    prompt = CLASSIF_PROMPT.format(
+            **{
+                "activity": activity,
+                "proposed_codes": format_codes(proposed_codes),
+                "format_instructions": parser.get_format_instructions(),
+            }
+        )
+    return [
+        {"role": "system", "content": SYS_PROMPT},
+        {"role": "user", "content": prompt},
+    ]
