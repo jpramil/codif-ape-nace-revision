@@ -117,6 +117,8 @@ def encore_multivoque():
                 "activ_nat_et",
                 "liasse_type",
                 "activ_surf_et",
+                "nace08_valid",
+                "codable",
             ],
         ]
     )
