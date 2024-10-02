@@ -122,7 +122,7 @@ def encore_multivoque():
     )
 
     pq.write_to_dataset(
-        pa.Table.from_pylist(df),
+        pa.Table.from_pandas(df),
         root_path=f"{URL_SIRENE4_MULTIVOCAL}/{"--".join(LLM_MODEL.split("/"))}",
         partition_cols=["nace08_valid", "codable"],
         basename_template="part-{i}.parquet",
