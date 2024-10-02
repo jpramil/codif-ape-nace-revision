@@ -1,7 +1,8 @@
 from typing import Optional
 
-from pydantic import BaseModel, Field
 from langchain_core.output_parsers import PydanticOutputParser
+from pydantic import BaseModel, Field
+
 from src.llm.prompting import PromptData
 
 
@@ -30,9 +31,7 @@ def process_response(response: str, prompt: PromptData, parser: PydanticOutputPa
     except ValueError as parse_error:
         # Log an error and return an un-codable response if parsing fails.
         print(f"Error processing row with id {prompt.id}: {parse_error}")
-        validated_response = LLMResponse(
-            codable=False, nace08_valid=None, nace2025=None
-        )
+        validated_response = LLMResponse(codable=False, nace08_valid=None, nace2025=None)
 
     if validated_response.nace2025 not in prompt.proposed_codes:
         # Log an error if the class code is invalid.
@@ -42,6 +41,6 @@ def process_response(response: str, prompt: PromptData, parser: PydanticOutputPa
         validated_response.codable = False
 
     return {
-            **validated_response.dict(),
-            "id": prompt.id,
-        }
+        **validated_response.dict(),
+        "id": prompt.id,
+    }

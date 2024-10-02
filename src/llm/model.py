@@ -1,7 +1,7 @@
 import os
 import subprocess
 
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from src.utils.data import get_file_system
 
@@ -100,4 +100,3 @@ def cache_model_from_hf_hub(
                 f"s3/{dir_model_s3}",
             ]
             subprocess.run(cmd, check=True)
-

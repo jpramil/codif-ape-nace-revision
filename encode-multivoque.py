@@ -1,26 +1,32 @@
-import pandas as pd
-from src.utils.data import get_file_system
-from src.mappings.mappings import get_mapping
-import duckdb
+import argparse
 import os
-import pyarrow.parquet as pq
+
+import duckdb
+import pandas as pd
 import pyarrow as pa
-from src.constants.paths import URL_SIRENE4_EXTRACTION, URL_SIRENE4_MULTIVOCAL, URL_MAPPING_TABLE, URL_EXPLANATORY_NOTES
-from src.llm.response import LLMResponse, process_response
-from src.constants.llm import LLM_MODEL, MAX_NEW_TOKEN, TEMPERATURE
-from src.llm.model import cache_model_from_hf_hub
+import pyarrow.parquet as pq
+from langchain_core.output_parsers import PydanticOutputParser
 from transformers import AutoTokenizer
 from vllm import LLM
 from vllm.sampling_params import SamplingParams
+
+from src.constants.llm import LLM_MODEL, MAX_NEW_TOKEN, TEMPERATURE
+from src.constants.paths import (
+    URL_EXPLANATORY_NOTES,
+    URL_MAPPING_TABLE,
+    URL_SIRENE4_EXTRACTION,
+    URL_SIRENE4_MULTIVOCAL,
+)
+from src.llm.model import cache_model_from_hf_hub
 from src.llm.prompting import generate_prompt
-from langchain_core.output_parsers import PydanticOutputParser
-import argparse
+from src.llm.response import LLMResponse, process_response
+from src.mappings.mappings import get_mapping
+from src.utils.data import get_file_system
 
 
 def encore_multivoque(
     model_name: str,
 ):
-
     parser = PydanticOutputParser(pydantic_object=LLMResponse)
     fs = get_file_system()
 
@@ -84,17 +90,19 @@ def encore_multivoque(
     llm = LLM(model=LLM_MODEL, max_model_len=20000, gpu_memory_utilization=0.95)
 
     prompts = [
-        generate_prompt(row, mapping_multivocal, parser)
-        for row in data.head(10).itertuples()
+        generate_prompt(row, mapping_multivocal, parser) for row in data.head(10).itertuples()
     ]
 
     batch_prompts = tokenizer.apply_chat_template(
-    [p.prompt for p in prompts], tokenize=False, add_generation_prompt=True
+        [p.prompt for p in prompts], tokenize=False, add_generation_prompt=True
     )
     outputs = llm.generate(batch_prompts, sampling_params=sampling_params)
     responses = [outputs[i].outputs[0].text for i in range(len(outputs))]
 
-    results = [process_response(response=response, prompt=prompt, parser=parser) for response, prompt in  zip(responses, prompts)]
+    results = [
+        process_response(response=response, prompt=prompt, parser=parser)
+        for response, prompt in zip(responses, prompts)
+    ]
 
     pq.write_to_dataset(
         pa.Table.from_pylist(results),
@@ -109,9 +117,7 @@ def encore_multivoque(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Recode into NACE2025 nomenclature")
 
-    parser.add_argument(
-        "--model_name", type=str, required=True, help="HuggingFace model name"
-    )
+    parser.add_argument("--model_name", type=str, required=True, help="HuggingFace model name")
 
     args = parser.parse_args()
     encore_multivoque(model_name=args.model_name)

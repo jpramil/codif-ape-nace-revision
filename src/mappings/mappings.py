@@ -1,4 +1,5 @@
 import unicodedata
+
 import pandas as pd
 
 
@@ -61,7 +62,9 @@ def format_explanatory_notes(explanatory_notes: str) -> str:
     )
 
 
-def find_explanatory_notes(explanatory_notes: pd.DataFrame, code25: str, naf_code_column: str = "naf08_niv4") -> pd.Series:
+def find_explanatory_notes(
+    explanatory_notes: pd.DataFrame, code25: str, naf_code_column: str = "naf08_niv4"
+) -> pd.Series:
     """
     Finds the explanatory notes for a given NAF 2025 code by looking it up in the explanatory_notes DataFrame.
     The function first searches for the full code and progressively attempts to find related codes if no match is found.
@@ -93,7 +96,7 @@ def find_explanatory_notes(explanatory_notes: pd.DataFrame, code25: str, naf_cod
     # If doesn't exist, try to find level 4 naf code in explanatory_notes (remove the last character)
     if row.empty:
         row = explanatory_notes.loc[explanatory_notes[naf_code_column] == code25[:-1]]
-        
+
         # If multiple or no matches, further filter based on 'indic.NAF' (or other criteria)
         if row.shape[0] != 1:
             row = explanatory_notes.loc[
@@ -133,15 +136,21 @@ def get_explanatory_notes(explanatory_notes: pd.DataFrame, code25: str, note_typ
     note_mapping = {
         "include": ["Comprend", "Comprend.aussi"],
         "not_include": ["Ne.comprend.pas"],
-        "notes": ["notes"]
+        "notes": ["notes"],
     }
 
     if note_type not in note_mapping:
-        raise ValueError(f"Invalid note_type '{note_type}'. Must be 'include', 'not_include', or 'notes'.")
+        raise ValueError(
+            f"Invalid note_type '{note_type}'. Must be 'include', 'not_include', or 'notes'."
+        )
 
     # Extract the relevant fields for the note_type
     columns = note_mapping[note_type]
-    extracted_values = [unicodedata.normalize("NFKC", row[col]) for col in columns if col in row and pd.notnull(row[col])]
+    extracted_values = [
+        unicodedata.normalize("NFKC", row[col])
+        for col in columns
+        if col in row and pd.notnull(row[col])
+    ]
 
     # Combine relevant fields for 'include' or return the value for 'not_include' and 'notes'
     if extracted_values:
@@ -153,14 +162,22 @@ def get_mapping(explanatory_notes: pd.DataFrame, mapping_table: pd.DataFrame) ->
     Generates a mapping of NAF 2008 codes to NAF 2025 codes with explanatory notes.
     """
     mapping_table = format_mapping_table(mapping_table)
-    return [NAF2008(
-        code=code08,
-        label=subset["lib_naf08_niv5"].iloc[0],
-        naf2025=[NAF2025(
-            code=row.naf25_niv5,
-            label=row.lib_naf25_niv5,
-            include=get_explanatory_notes(explanatory_notes, row.naf25_niv5, "notes"),
-            not_include=get_explanatory_notes(explanatory_notes, row.naf25_niv5, "not_include"),
-            notes=get_explanatory_notes(explanatory_notes, row.naf25_niv5, "notes")
-        ) for row in subset.itertuples()]
-    ) for code08, subset in mapping_table.groupby("naf08_niv5")]
+    return [
+        NAF2008(
+            code=code08,
+            label=subset["lib_naf08_niv5"].iloc[0],
+            naf2025=[
+                NAF2025(
+                    code=row.naf25_niv5,
+                    label=row.lib_naf25_niv5,
+                    include=get_explanatory_notes(explanatory_notes, row.naf25_niv5, "notes"),
+                    not_include=get_explanatory_notes(
+                        explanatory_notes, row.naf25_niv5, "not_include"
+                    ),
+                    notes=get_explanatory_notes(explanatory_notes, row.naf25_niv5, "notes"),
+                )
+                for row in subset.itertuples()
+            ],
+        )
+        for code08, subset in mapping_table.groupby("naf08_niv5")
+    ]

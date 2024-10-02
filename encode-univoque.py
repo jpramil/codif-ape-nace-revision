@@ -1,8 +1,10 @@
-import pandas as pd
-import duckdb
-from src.utils.data import get_file_system
-from src.mappings.mappings import create_mapping
 import os
+
+import duckdb
+import pandas as pd
+
+from src.mappings.mappings import create_mapping
+from src.utils.data import get_file_system
 
 
 def encore_univoque(

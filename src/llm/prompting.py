@@ -34,16 +34,15 @@ def format_code25(codes: list):
 
 
 def format_code08(codes: list):
-    return "\n\n".join(
-        [
-            f"{nace08.code}: {nace08.label}"
-            for nace08 in codes
-        ]
-    )
+    return "\n\n".join([f"{nace08.code}: {nace08.label}" for nace08 in codes])
 
 
 def extract_info(nace2025, paragraphs=["include", "not_include", "notes"]):
-    info = [getattr(nace2025, paragraph) for paragraph in paragraphs if getattr(nace2025, paragraph) is not None]
+    info = [
+        getattr(nace2025, paragraph)
+        for paragraph in paragraphs
+        if getattr(nace2025, paragraph) is not None
+    ]
     return "\n\n".join(info) if info else ""
 
 
@@ -54,18 +53,18 @@ def generate_prompt(row, mapping, parser):
 
     proposed_codes = next((m.naf2025 for m in mapping if m.code == nace08))
     prompt = CLASSIF_PROMPT.format(
-            **{
-                "activity": activity,
-                "nace08": format_code08(next((m for m in mapping if m.code == nace08))),
-                "proposed_codes": format_code25(proposed_codes),
-                "format_instructions": parser.get_format_instructions(),
-            }
-        )
+        **{
+            "activity": activity,
+            "nace08": format_code08(next((m for m in mapping if m.code == nace08))),
+            "proposed_codes": format_code25(proposed_codes),
+            "format_instructions": parser.get_format_instructions(),
+        }
+    )
     return PromptData(
         id=row_id,
         proposed_codes=[c.code for c in proposed_codes],
-        prompt= [
-        {"role": "system", "content": SYS_PROMPT},
-        {"role": "user", "content": prompt},
-        ]
+        prompt=[
+            {"role": "system", "content": SYS_PROMPT},
+            {"role": "user", "content": prompt},
+        ],
     )
