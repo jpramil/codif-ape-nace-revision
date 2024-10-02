@@ -87,9 +87,7 @@ def encore_multivoque():
     tokenizer = AutoTokenizer.from_pretrained(LLM_MODEL)
     llm = LLM(model=LLM_MODEL, max_model_len=20000, gpu_memory_utilization=0.95)
 
-    prompts = [
-        generate_prompt(row, mapping_multivocal, parser) for row in data.head(10).itertuples()
-    ]
+    prompts = [generate_prompt(row, mapping_multivocal, parser) for row in data.itertuples()]
 
     batch_prompts = tokenizer.apply_chat_template(
         [p.prompt for p in prompts], tokenize=False, add_generation_prompt=True
@@ -102,26 +100,22 @@ def encore_multivoque():
         for response, prompt in zip(responses, prompts)
     ]
 
-    df = (
-        data.head(10)
-        .merge(pd.DataFrame(results), on="id")
-        .loc[
-            :,
-            [
-                "liasse_numero",
-                "apet_finale",
-                "nace2025",
-                "libelle_activite",
-                "evenement_type",
-                "cj",
-                "activ_nat_et",
-                "liasse_type",
-                "activ_surf_et",
-                "nace08_valid",
-                "codable",
-            ],
-        ]
-    )
+    df = data.merge(pd.DataFrame(results), on="id").loc[
+        :,
+        [
+            "liasse_numero",
+            "apet_finale",
+            "nace2025",
+            "libelle_activite",
+            "evenement_type",
+            "cj",
+            "activ_nat_et",
+            "liasse_type",
+            "activ_surf_et",
+            "nace08_valid",
+            "codable",
+        ],
+    ]
 
     pq.write_to_dataset(
         pa.Table.from_pandas(df),
