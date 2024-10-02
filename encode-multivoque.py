@@ -1,52 +1,38 @@
 import pandas as pd
+from src.utils.data import get_file_system
+from src.mappings.mappings import get_mapping
 import duckdb
 import os
-from tqdm import tqdm
 import pyarrow.parquet as pq
 import pyarrow as pa
-from src.utils.data import get_file_system
-from src.mappings.mappings import create_mapping
-from src.llm.model import get_model
+from src.constants.paths import URL_SIRENE4_EXTRACTION, URL_SIRENE4_MULTIVOCAL, URL_MAPPING_TABLE, URL_EXPLANATORY_NOTES
+from src.llm.response import LLMResponse, process_response
+from src.constants.llm import LLM_MODEL, MAX_NEW_TOKEN, TEMPERATURE
+from src.llm.model import cache_model_from_hf_hub
+from transformers import AutoTokenizer
+from vllm import LLM
+from vllm.sampling_params import SamplingParams
 from src.llm.prompting import generate_prompt
+from langchain_core.output_parsers import PydanticOutputParser
+import argparse
 
 
 def encore_multivoque(
-    url_source: str,
-    url_out: str,
     model_name: str,
-    device: str = "cuda",
 ):
-    """
-    Processes multivoque (ambiguous) NAF codes from a source dataset and relabels them using a language model.
 
-    Parameters:
-    -----------
-    url_source : str
-        The S3 URL of the source dataset in Parquet format to be processed.
-
-    url_out : str
-        The S3 URL where the relabeled output dataset will be saved as a Parquet file.
-
-    model_name : str
-        The name or path of the language model to be used for generating predictions.
-
-    device : str, optional, default="cuda"
-        The device on which to run the model (e.g., 'cuda' for GPU, 'cpu' for CPU).
-    """
-
+    parser = PydanticOutputParser(pydantic_object=LLMResponse)
     fs = get_file_system()
 
     # Load excel files containing informations about mapping
-    with fs.open("s3://projet-ape/NAF-revision/table-correspondance-naf2025.xls") as f:
+    with fs.open(URL_MAPPING_TABLE) as f:
         table_corres = pd.read_excel(f, dtype=str)
 
-    with fs.open("s3://projet-ape/NAF-revision/notes-explicatives-naf2025.xlsx") as f:
+    with fs.open(URL_EXPLANATORY_NOTES) as f:
         notes_ex = pd.read_excel(f, dtype=str)
 
-    mapping = create_mapping(table_corres, notes_ex)
-
-    # Select all multivoque codes
-    multivoques = [naf08 for naf08 in mapping.keys() if len(mapping[naf08]["naf25"]) > 1]
+    mapping = get_mapping(notes_ex, table_corres)
+    mapping_multivocal = [code for code in mapping if len(code.naf2025) > 1]
 
     con = duckdb.connect(database=":memory:")
     data = con.query(
@@ -59,9 +45,9 @@ def encore_multivoque(
         SELECT
             *
         FROM
-            read_parquet('{url_source}')
+            read_parquet('{URL_SIRENE4_EXTRACTION}')
         WHERE
-            apet_finale IN ('{"', '".join(multivoques)}')
+            apet_finale IN ('{"', '".join([m.code for m in mapping_multivocal])}')
     ;
     """
     ).to_df()
@@ -86,53 +72,46 @@ def encore_multivoque(
     data.reset_index(drop=True, inplace=True)
     con.close()
 
-    tokenizer, model = get_model(model_name, device=device)
-    tokenizer.pad_token = tokenizer.eos_token
+    cache_model_from_hf_hub(
+        LLM_MODEL,
+    )
 
-    results = []
-    for row in tqdm(data.itertuples(), total=data.shape[0]):
-        # Generate the prompt and append the eos_token (end of sequence marker)
-        prompt = f"{generate_prompt(mapping, row.apet_finale, row.libelle_activite, include_notes=False)}"
-        prompt += tokenizer.eos_token
+    sampling_params = SamplingParams(
+        max_tokens=MAX_NEW_TOKEN, temperature=TEMPERATURE, top_p=0.8, repetition_penalty=1.05
+    )
 
-        # Tokenize the input
-        inputs = tokenizer(prompt, return_tensors="pt").to(device)
+    tokenizer = AutoTokenizer.from_pretrained(LLM_MODEL)
+    llm = LLM(model=LLM_MODEL, max_model_len=20000, gpu_memory_utilization=0.95)
 
-        # Generate the output
-        outputs = model.generate(
-            **inputs,
-            max_new_tokens=10,
-            temperature=0.1,
-            top_p=0.8,
-            repetition_penalty=1.2,
-            pad_token_id=tokenizer.eos_token_id,  # Use the eos_token_id
-            eos_token_id=tokenizer.eos_token_id,
-        )
+    prompts = [
+        generate_prompt(row, mapping_multivocal, parser)
+        for row in data.head(10).itertuples()
+    ]
 
-        # Decode the generated output
-        response = tokenizer.decode(outputs[0][-4:], skip_special_tokens=True)
+    batch_prompts = tokenizer.apply_chat_template(
+    [p.prompt for p in prompts], tokenize=False, add_generation_prompt=True
+    )
+    outputs = llm.generate(batch_prompts, sampling_params=sampling_params)
+    responses = [outputs[i].outputs[0].text for i in range(len(outputs))]
 
-        # Make sure the predicted code is from the list of potential code
-        if response not in mapping[row.apet_finale]["naf25"]:
-            response = None
+    results = [process_response(response=response, prompt=prompt, parser=parser) for response, prompt in  zip(responses, prompts)]
 
-        results.append({"id": row.id, "liasse_numero": row.liasse_numero, "naf_25_niv5": response})
-
-    data = data.merge(pd.DataFrame(results), on=["id", "liasse_numero"])
-
-    pq.write_table(
-        pa.Table.from_pandas(data),
-        url_out,
+    pq.write_to_dataset(
+        pa.Table.from_pylist(results),
+        root_path=f"{URL_SIRENE4_MULTIVOCAL}/{LLM_MODEL}",
+        partition_cols=["nace08_valid", "codable"],
+        basename_template="part-{i}.parquet",
+        existing_data_behavior="overwrite_or_ignore",
         filesystem=fs,
     )
 
 
 if __name__ == "__main__":
-    assert "HF_TOKEN" in os.environ, "Please set the HF_TOKEN environment variable."
+    parser = argparse.ArgumentParser(description="Recode into NACE2025 nomenclature")
 
-    URL = "s3://projet-ape/extractions/20240812_sirene4.parquet"
-    URL_OUT = "s3://projet-ape/NAF-revision/relabeled-data/20240812_sirene4_multivoques.parquet"
-    model_name = "meta-llama/Meta-Llama-3.1-8B-Instruct"
-    device = "cuda"
+    parser.add_argument(
+        "--model_name", type=str, required=True, help="HuggingFace model name"
+    )
 
-    encore_multivoque(URL, URL_OUT, model_name, device=device)
+    args = parser.parse_args()
+    encore_multivoque(model_name=args.model_name)

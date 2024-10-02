@@ -1,13 +1,21 @@
-SYS_PROMPT = """You are an expert in the NACE. Your goal is:
+from collections import namedtuple
 
-1. Analyze the job title and job description provided by the user.
-2. From the list of occupational categories provided, identify the most appropriate ISCO code (4 digits) based on the job description. If the job description is not clear, use the job title to classify the job.
-3. Return the 4-digit code in JSON format as specified by the user. If the job cannot be classified within the given categories, return `null` in the JSON.
+PromptData = namedtuple("PromptData", ["id", "proposed_codes", "prompt"])
+
+SYS_PROMPT = """Tu es un expert de la Nomenclature statistique des Activités économiques dans la Communauté Européenne (NACE). Tu es chargé de réaliser le changement de nomenclature. Pour cela, tu dois attribuer un code NACE 2025 à une entreprise en fonction du descriptif de son activité à partir d'une liste de code proposée déduit de son code NACE 2008 connu. Voici les instructions à suivre :
+
+1. Analyse l'activité de l'entreprise et le code NACE 2008 affecté fournit par l'utilisateur.
+2. A partir de la liste des catégories d'activités fournie, identifie le code NACE 2025 le plus approprié basé sur la description de l'activité de l'entreprise.
+3. Retoure le code NACE 2025 au format JSON comme spécifié par l'utilisateur. Si la description de l'entreprise n'est pas suffisament claire, pour être classée dans une des catégories proposées, retourne `null` dans le JSON.
+4. Vérifie la cohérence du code NACE 2008 affecté avec la description de l'activité de l'entreprise. Si le code NACE 2008 affecté ne correspond pas à la description de l'entreprise, retourne `False` dans le champ `nace08_valid` du JSON.
 """
 
 CLASSIF_PROMPT = """\
 - Activité de l'entreprise :
 {activity}
+
+- Ancien code NACE 2008 affecté:
+{nace08}
 
 - Liste des codes NACE potentiels et leurs notes explicatives :
 {proposed_codes}
@@ -16,14 +24,23 @@ CLASSIF_PROMPT = """\
 """
 
 
-def format_codes(codes: list):
+def format_code25(codes: list):
     return "\n\n".join(
         [
             f"{nace2025.code}: {nace2025.label}\n{extract_info(nace2025, paragraphs=["include", "not_include", "notes"])}"
             for nace2025 in codes
         ]
     )
-    
+
+
+def format_code08(codes: list):
+    return "\n\n".join(
+        [
+            f"{nace08.code}: {nace08.label}"
+            for nace08 in codes
+        ]
+    )
+
 
 def extract_info(nace2025, paragraphs=["include", "not_include", "notes"]):
     info = [getattr(nace2025, paragraph) for paragraph in paragraphs if getattr(nace2025, paragraph) is not None]
@@ -33,16 +50,22 @@ def extract_info(nace2025, paragraphs=["include", "not_include", "notes"]):
 def generate_prompt(row, mapping, parser):
     nace08 = row.apet_finale
     activity = row.libelle_activite
+    row_id = row.id
 
     proposed_codes = next((m.naf2025 for m in mapping if m.code == nace08))
     prompt = CLASSIF_PROMPT.format(
             **{
                 "activity": activity,
-                "proposed_codes": format_codes(proposed_codes),
+                "nace08": format_code08(next((m for m in mapping if m.code == nace08))),
+                "proposed_codes": format_code25(proposed_codes),
                 "format_instructions": parser.get_format_instructions(),
             }
         )
-    return [
+    return PromptData(
+        id=row_id,
+        proposed_codes=[c.code for c in proposed_codes],
+        prompt= [
         {"role": "system", "content": SYS_PROMPT},
         {"role": "user", "content": prompt},
-    ]
+        ]
+    )
