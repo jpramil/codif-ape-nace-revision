@@ -18,7 +18,7 @@ spec:
           - name: relabel-naf08-to-naf25
             template: run-relabel
 
-    # Worker templat
+    # Worker template
     - name: run-relabel
       nodeSelector:
         nvidia.com/gpu.product: "NVIDIA-H100-PCIe"
@@ -34,7 +34,7 @@ spec:
             git clone https://github.com/InseeFrLab/codif-ape-nace-revision.git &&
             cd codif-ape-nace-revision/ &&
             pip install -r requirements.txt &&
-            python encode-univoque.py &&
+            export MC_HOST_s3=https://$AWS_ACCESS_KEY_ID:$AWS_SECRET_ACCESS_KEY@$AWS_S3_ENDPOINT &&
             python encode-multivoque.py
 
         volumeMounts:
