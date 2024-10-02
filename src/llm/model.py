@@ -8,7 +8,7 @@ from src.utils.data import get_file_system
 
 def cache_model_from_hf_hub(
     model_name,
-    s3_bucket="projet-dedup-oja",
+    s3_bucket="projet-ape",
     s3_cache_dir="models/hf_hub",
 ):
     """Use S3 as proxy cache from HF hub if a model is not already cached locally.
