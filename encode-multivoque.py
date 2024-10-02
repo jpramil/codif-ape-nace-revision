@@ -24,9 +24,7 @@ from src.mappings.mappings import get_mapping
 from src.utils.data import get_file_system
 
 
-def encore_multivoque(
-    model_name: str,
-):
+def encore_multivoque():
     parser = PydanticOutputParser(pydantic_object=LLMResponse)
     fs = get_file_system()
 
@@ -104,9 +102,28 @@ def encore_multivoque(
         for response, prompt in zip(responses, prompts)
     ]
 
+    df = (
+        data.head(10)
+        .merge(pd.DataFrame(results), on="id")
+        .loc[
+            :,
+            [
+                "liasse_numero",
+                "apet_finale",
+                "nace2025",
+                "libelle_activite",
+                "evenement_type",
+                "cj",
+                "activ_nat_et",
+                "liasse_type",
+                "activ_surf_et",
+            ],
+        ]
+    )
+
     pq.write_to_dataset(
-        pa.Table.from_pylist(results),
-        root_path=f"{URL_SIRENE4_MULTIVOCAL}/{LLM_MODEL}",
+        pa.Table.from_pylist(df),
+        root_path=f"{URL_SIRENE4_MULTIVOCAL}/{"--".join(LLM_MODEL.split("/"))}",
         partition_cols=["nace08_valid", "codable"],
         basename_template="part-{i}.parquet",
         existing_data_behavior="overwrite_or_ignore",
@@ -117,7 +134,4 @@ def encore_multivoque(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Recode into NACE2025 nomenclature")
 
-    parser.add_argument("--model_name", type=str, required=True, help="HuggingFace model name")
-
-    args = parser.parse_args()
-    encore_multivoque(model_name=args.model_name)
+    encore_multivoque()

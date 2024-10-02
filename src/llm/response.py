@@ -36,7 +36,7 @@ def process_response(response: str, prompt: PromptData, parser: PydanticOutputPa
     if validated_response.nace2025 not in prompt.proposed_codes:
         # Log an error if the class code is invalid.
         print(
-            f"Error processing row with id {prompt.id}: Code not in the ISCO list --> {validated_response.nace2025}"
+            f"Error processing row with id {prompt.id}: Code not in the provided list --> {validated_response.nace2025}"
         )
         validated_response.codable = False
 
