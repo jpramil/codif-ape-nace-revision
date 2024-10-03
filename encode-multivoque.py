@@ -2,6 +2,7 @@ import argparse
 import os
 
 import duckdb
+import mlflow
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -10,12 +11,13 @@ from transformers import AutoTokenizer
 from vllm import LLM
 from vllm.sampling_params import SamplingParams
 
-from src.constants.llm import LLM_MODEL, MAX_NEW_TOKEN, TEMPERATURE
+from src.constants.llm import LLM_MODEL, MAX_NEW_TOKEN, TEMPERATURE, TOP_P, REP_PENALTY
 from src.constants.paths import (
     URL_EXPLANATORY_NOTES,
     URL_MAPPING_TABLE,
     URL_SIRENE4_EXTRACTION,
     URL_SIRENE4_MULTIVOCAL,
+    URL_GROUND_TRUTH,
 )
 from src.llm.model import cache_model_from_hf_hub
 from src.llm.prompting import generate_prompt
@@ -24,7 +26,10 @@ from src.mappings.mappings import get_mapping
 from src.utils.data import get_file_system
 
 
-def encore_multivoque():
+def encore_multivoque(
+    experiment_name: str,
+    run_name: str,
+):
     parser = PydanticOutputParser(pydantic_object=LLMResponse)
     fs = get_file_system()
 
@@ -76,12 +81,21 @@ def encore_multivoque():
     data.reset_index(drop=True, inplace=True)
     con.close()
 
+    ground_truth = (
+        pq.ParquetDataset(URL_GROUND_TRUTH.replace("s3://", ""), filesystem=fs).read().to_pandas()
+    )
+
+    data = data.loc[data["liasse_numero"].isin(ground_truth["liasse_numero"].sample(10).tolist())]
+
     cache_model_from_hf_hub(
         LLM_MODEL,
     )
 
     sampling_params = SamplingParams(
-        max_tokens=MAX_NEW_TOKEN, temperature=TEMPERATURE, top_p=0.8, repetition_penalty=1.05
+        max_tokens=MAX_NEW_TOKEN,
+        temperature=TEMPERATURE,
+        top_p=TOP_P,
+        repetition_penalty=REP_PENALTY,
     )
 
     tokenizer = AutoTokenizer.from_pretrained(LLM_MODEL)
@@ -92,42 +106,101 @@ def encore_multivoque():
     batch_prompts = tokenizer.apply_chat_template(
         [p.prompt for p in prompts], tokenize=False, add_generation_prompt=True
     )
-    outputs = llm.generate(batch_prompts, sampling_params=sampling_params)
-    responses = [outputs[i].outputs[0].text for i in range(len(outputs))]
 
-    results = [
-        process_response(response=response, prompt=prompt, parser=parser)
-        for response, prompt in zip(responses, prompts)
-    ]
+    mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI"))
+    mlflow.set_experiment(experiment_name)
 
-    df = data.merge(pd.DataFrame(results), on="id").loc[
-        :,
-        [
-            "liasse_numero",
-            "apet_finale",
-            "nace2025",
-            "libelle_activite",
-            "evenement_type",
-            "cj",
-            "activ_nat_et",
-            "liasse_type",
-            "activ_surf_et",
-            "nace08_valid",
-            "codable",
-        ],
-    ]
+    with mlflow.start_run(run_name=run_name):
+        outputs = llm.generate(batch_prompts, sampling_params=sampling_params)
+        responses = [outputs[i].outputs[0].text for i in range(len(outputs))]
 
-    pq.write_to_dataset(
-        pa.Table.from_pandas(df),
-        root_path=f"{URL_SIRENE4_MULTIVOCAL}/{"--".join(LLM_MODEL.split("/"))}",
-        partition_cols=["nace08_valid", "codable"],
-        basename_template="part-{i}.parquet",
-        existing_data_behavior="overwrite_or_ignore",
-        filesystem=fs,
-    )
+        results = [
+            process_response(response=response, prompt=prompt, parser=parser)
+            for response, prompt in zip(responses, prompts)
+        ]
 
+        df = data.merge(pd.DataFrame(results), on="liasse_numero").loc[
+            :,
+            [
+                "liasse_numero",
+                "apet_finale",
+                "nace2025",
+                "libelle_activite",
+                "evenement_type",
+                "cj",
+                "activ_nat_et",
+                "liasse_type",
+                "activ_surf_et",
+                "nace08_valid",
+                "codable",
+            ],
+        ]
+
+        pq.write_to_dataset(
+            pa.Table.from_pandas(df),
+            root_path=f"{URL_SIRENE4_MULTIVOCAL}/{"--".join(LLM_MODEL.split("/"))}",
+            partition_cols=["nace08_valid", "codable"],
+            basename_template="part-{i}.parquet",
+            existing_data_behavior="overwrite_or_ignore",
+            filesystem=fs,
+        )
+
+        ground_truth = (
+            pq.ParquetDataset(URL_GROUND_TRUTH.replace("s3://", ""), filesystem=fs)
+            .read()
+            .to_pandas()
+        )
+
+        df = ground_truth.merge(
+            df, on="liasse_numero", suffixes=("_gt", "_llm")
+        )  # .loc[: , ["liasse_numero", "nace2025", "apet_manual"]]
+
+        accuracies = {
+            f"accuracy_lvl_{i}": round(
+                (df["apet_manual"].str[:i] == df["nace2025"].str[:i]).mean() * 100, 2
+            )
+            for i in [5, 4, 3, 2, 1]
+        }
+        for metric, value in accuracies.items():
+            mlflow.log_metric(metric, value)
+
+        mlflow.log_param("LLM_MODEL", LLM_MODEL)
+        mlflow.log_param("TEMPERATURE", TEMPERATURE)
+        mlflow.log_param("TOP_P", TOP_P)
+        mlflow.log_param("REP_PENALTY", REP_PENALTY)
+        mlflow.log_param("input_path", URL_SIRENE4_EXTRACTION)
+        mlflow.log_param(
+            "output_path", f"{URL_SIRENE4_MULTIVOCAL}/{"--".join(LLM_MODEL.split("/"))}"
+        )
+
+        mlflow.log_table(
+            data=df[df["apet_manual"].str[:1] != df["nace2025"].str[:1]].head(20),
+            artifact_file="sample_misclassified.json",
+        )
+
+
+# ajouter dataset + changer version mlflow
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Recode into NACE2025 nomenclature")
 
-    encore_multivoque()
+    assert (
+        "MLFLOW_TRACKING_URI" in os.environ
+    ), "Please set the MLFLOW_TRACKING_URI environment variable."
+
+    parser.add_argument(
+        "--experiment_name",
+        type=str,
+        default="Test",
+        help="Experiment name in MLflow",
+    )
+    parser.add_argument(
+        "--run_name",
+        type=str,
+        default=None,
+        help="Run name in MLflow",
+    )
+
+    args = parser.parse_args()
+
+    encore_multivoque(**vars(args))

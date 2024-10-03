@@ -42,5 +42,5 @@ def process_response(response: str, prompt: PromptData, parser: PydanticOutputPa
 
     return {
         **validated_response.dict(),
-        "id": prompt.id,
+        "liasse_numero": prompt.id,
     }
