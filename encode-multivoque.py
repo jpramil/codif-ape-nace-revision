@@ -7,11 +7,10 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 from langchain_core.output_parsers import PydanticOutputParser
-from transformers import AutoTokenizer
 from vllm import LLM
 from vllm.sampling_params import SamplingParams
 
-from src.constants.llm import LLM_MODEL, MAX_NEW_TOKEN, TEMPERATURE, TOP_P, REP_PENALTY
+from src.constants.llm import LLM_MODEL, MAX_NEW_TOKEN, TEMPERATURE, TOP_P, REP_PENALTY, MODEL_TO_ARGS
 from src.constants.paths import (
     URL_EXPLANATORY_NOTES,
     URL_MAPPING_TABLE,
@@ -19,8 +18,9 @@ from src.constants.paths import (
     URL_SIRENE4_MULTIVOCAL,
     URL_GROUND_TRUTH,
 )
+from src.constants.prompting import MODEL_TO_PROMPT_FORMAT
 from src.llm.model import cache_model_from_hf_hub
-from src.llm.prompting import generate_prompt
+from src.llm.prompting import generate_prompt, apply_template
 from src.llm.response import LLMResponse, process_response
 from src.mappings.mappings import get_mapping
 from src.utils.data import get_file_system
@@ -98,14 +98,14 @@ def encore_multivoque(
         repetition_penalty=REP_PENALTY,
     )
 
-    tokenizer = AutoTokenizer.from_pretrained(LLM_MODEL)
-    llm = LLM(model=LLM_MODEL, max_model_len=20000, gpu_memory_utilization=0.95)
+    llm = LLM(
+        model=LLM_MODEL,
+        **MODEL_TO_ARGS.get(LLM_MODEL, {})
+    )
 
     prompts = [generate_prompt(row, mapping_multivocal, parser) for row in data.itertuples()]
 
-    batch_prompts = tokenizer.apply_chat_template(
-        [p.prompt for p in prompts], tokenize=False, add_generation_prompt=True
-    )
+    batch_prompts = apply_template([p.prompt for p in prompts], MODEL_TO_PROMPT_FORMAT[LLM_MODEL])
 
     mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI"))
     mlflow.set_experiment(experiment_name)
