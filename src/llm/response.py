@@ -10,8 +10,7 @@ class LLMResponse(BaseModel):
     """Represents a response model for classification code assignment."""
 
     codable: bool = Field(
-        description="""True if enough information is provided to decide
-        classification code, False otherwise."""
+        description="""True if enough information is provided to decide classification code, False otherwise."""
     )
 
     nace08_valid: Optional[bool] = Field(
