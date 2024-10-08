@@ -120,21 +120,23 @@ def encore_multivoque(
         ]
 
         df = data.merge(pd.DataFrame(results), on="liasse_numero").loc[
-            :,
-            [
-                "liasse_numero",
-                "apet_finale",
-                "nace2025",
-                "libelle_activite",
-                "evenement_type",
-                "cj",
-                "activ_nat_et",
-                "liasse_type",
-                "activ_surf_et",
-                "nace08_valid",
-                "codable",
-            ],
-        ]
+                :,
+                [
+                    "liasse_numero",
+                    "apet_finale",
+                    "nace2025",
+                    "libelle_activite",
+                    "activ_sec_agri_et",
+                    "activ_nat_lib_et",
+                    "evenement_type",
+                    "cj",
+                    "activ_nat_et",
+                    "liasse_type",
+                    "activ_surf_et",
+                    "nace08_valid",
+                    "codable",
+                ],
+            ]
 
         pq.write_to_dataset(
             pa.Table.from_pandas(df),
@@ -150,6 +152,12 @@ def encore_multivoque(
             .read()
             .to_pandas()
         )
+
+        mlflow.log_param("num_not_coded", len(df) - df["codable"].sum())
+        mlflow.log_param("pct_not_coded", round((len(df) - df["codable"].sum())/len(df) * 100, 2))
+
+        # Keep only rows coded by the model
+        df = df[df["codable"]]
 
         df = ground_truth.merge(
             df, on="liasse_numero", suffixes=("_gt", "_llm")
@@ -173,14 +181,13 @@ def encore_multivoque(
             "output_path", f"{URL_SIRENE4_MULTIVOCAL}/{"--".join(LLM_MODEL.split("/"))}"
         )
 
+        failed_to_log = df[df["apet_manual"].str[:1] != df["nace2025"].str[:1]].loc[:20, ["liasse_numero", "libelle", "apet_manual", "nace2025", "activ_nat_lib_et", "codable"]]
         mlflow.log_table(
-            data=df[df["apet_manual"].str[:1] != df["nace2025"].str[:1]].head(20),
+            data=failed_to_log,
             artifact_file="sample_misclassified.json",
         )
 
-
-# ajouter dataset + changer version mlflow
-
+        
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Recode into NACE2025 nomenclature")
 
