@@ -31,7 +31,7 @@ def extract_info(nace2025, paragraphs: list[str]):
 
 def generate_prompt(row, mapping, parser):
     nace08 = row.apet_finale
-    activity = row.libelle_activite
+    activity = row.libelle_activite.lower() if row.libelle_activite.isupper() else row.libelle_activite
     row_id = row.liasse_numero
 
     proposed_codes = next((m.naf2025 for m in mapping if m.code == nace08))
