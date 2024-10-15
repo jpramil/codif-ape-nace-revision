@@ -85,6 +85,7 @@ def encore_multivoque(
         pq.ParquetDataset(URL_GROUND_TRUTH.replace("s3://", ""), filesystem=fs).read().to_pandas()
     )
 
+    # TODO: Temp to only run data that has been manually coded
     data = data.loc[data["liasse_numero"].isin(ground_truth["liasse_numero"].sample(10).tolist())]
 
     cache_model_from_hf_hub(
@@ -119,7 +120,7 @@ def encore_multivoque(
             for response, prompt in zip(responses, prompts)
         ]
 
-        df = data.merge(pd.DataFrame(results), on="liasse_numero").loc[
+        results_df = data.merge(pd.DataFrame(results), on="liasse_numero").loc[
                 :,
                 [
                     "liasse_numero",
@@ -139,7 +140,7 @@ def encore_multivoque(
             ]
 
         pq.write_to_dataset(
-            pa.Table.from_pandas(df),
+            pa.Table.from_pandas(results_df),
             root_path=f"{URL_SIRENE4_MULTIVOCAL}/{"--".join(LLM_MODEL.split("/"))}",
             partition_cols=["nace08_valid", "codable"],
             basename_template="part-{i}.parquet",
@@ -153,19 +154,18 @@ def encore_multivoque(
             .to_pandas()
         )
 
-        mlflow.log_param("num_not_coded", len(df) - df["codable"].sum())
-        mlflow.log_param("pct_not_coded", round((len(df) - df["codable"].sum())/len(df) * 100, 2))
+        mlflow.log_param("num_not_coded", len(results_df) - results_df["codable"].sum())
+        mlflow.log_param("pct_not_coded", round((len(results_df) - results_df["codable"].sum())/len(results_df) * 100, 2))
 
         # Keep only rows coded by the model
-        df = df[df["codable"]]
+        results_df_subset = results_df[results_df["codable"]]
 
-        df = ground_truth.merge(
-            df, on="liasse_numero", suffixes=("_gt", "_llm")
-        )  # .loc[: , ["liasse_numero", "nace2025", "apet_manual"]]
+        results_df_subset = ground_truth.merge(
+            results_df_subset[["liasse_numero", "apet_finale",	"nace2025", "nace08_valid",	"codable"]], on="liasse_numero")
 
         accuracies = {
             f"accuracy_lvl_{i}": round(
-                (df["apet_manual"].str[:i] == df["nace2025"].str[:i]).mean() * 100, 2
+                (results_df_subset["apet_manual"].str[:i] == results_df_subset["nace2025"].str[:i]).mean() * 100, 2
             )
             for i in [5, 4, 3, 2, 1]
         }
@@ -181,7 +181,7 @@ def encore_multivoque(
             "output_path", f"{URL_SIRENE4_MULTIVOCAL}/{"--".join(LLM_MODEL.split("/"))}"
         )
 
-        failed_to_log = df[df["apet_manual"].str[:1] != df["nace2025"].str[:1]].loc[:20, ["liasse_numero", "libelle", "apet_manual", "nace2025", "activ_nat_lib_et", "codable"]]
+        failed_to_log = results_df_subset[results_df_subset["apet_manual"].str[:1] != results_df_subset["nace2025"].str[:1]].loc[:20, ["liasse_numero", "libelle", "apet_manual", "nace2025", "activ_nat_lib_et", "codable"]]
         mlflow.log_table(
             data=failed_to_log,
             artifact_file="sample_misclassified.json",
