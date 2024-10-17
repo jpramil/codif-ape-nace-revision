@@ -9,29 +9,40 @@ MODEL_TO_ARGS = {
         "tokenizer_mode": "mistral",
         "config_format": "mistral",
         "load_format": "mistral",
+        "enforce_eager": True,
     },
     "mistralai/Ministral-8B-Instruct-2410": {
         "tokenizer_mode": "mistral",
         "config_format": "mistral",
         "load_format": "mistral",
+        "enforce_eager": True,
     },
     "mistralai/Mistral-Small-Instruct-2409": {
         "tokenizer_mode": "mistral",
         "config_format": "mistral",
         "load_format": "mistral",
+        "enforce_eager": True,
     },
     "Qwen/Qwen2.5-1.5B-Instruct": {},
     "Qwen/Qwen2.5-32B-Instruct": {
         "max_model_len": 20000,
         "gpu_memory_utilization": 0.95,
+        "enforce_eager": True,
+    },
+    "Qwen/Qwen2.5-72B-Instruct-GPTQ-Int4": {
+        "max_model_len": 8192,
+        "gpu_memory_utilization": 1.0,
+        "enforce_eager": True,
     },
     "meta-llama/Meta-Llama-3.1-8B-Instruct": {},
     "hugging-quants/Meta-Llama-3.1-70B-Instruct-GPTQ-INT4": {
-        "max_model_len": 110000,
-        "gpu_memory_utilization": 0.95,
+        "max_model_len": 32768,
+        "gpu_memory_utilization": 1.0,
+        "enforce_eager": True,
     },
     "neuralmagic/Llama-3.1-Nemotron-70B-Instruct-HF-FP8-dynamic": {
         "max_model_len": 10000,
-        "gpu_memory_utilization": 0.95,
+        "gpu_memory_utilization": 1.0,
+        "enforce_eager": True,
     },
 }

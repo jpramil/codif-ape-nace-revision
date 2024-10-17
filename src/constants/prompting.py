@@ -61,6 +61,9 @@ MODEL_TO_PROMPT_FORMAT = {
     "Qwen/Qwen2.5-32B-Instruct": (
         "<|im_start|>system\n{system_prompt}<|im_end|>\n<|im_start|>user\n{user_prompt}<|im_end|>\n<|im_start|>assistant"
     ),
+    "Qwen/Qwen2.5-72B-Instruct-GPTQ-Int4": (
+        "<|im_start|>system\n{system_prompt}<|im_end|>\n<|im_start|>user\n{user_prompt}<|im_end|>\n<|im_start|>assistant"
+    ),
     # META-LLAMA
     "meta-llama/Meta-Llama-3.1-8B-Instruct": (
         "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n{system_prompt}<|eot_id|>\n"

@@ -15,6 +15,7 @@ spec:
       - name: params-conf-list
         value: '[
             {"LLM_NAME": "Qwen/Qwen2.5-32B-Instruct"},
+            {"LLM_NAME": "Qwen/Qwen2.5-72B-Instruct-GPTQ-Int4"},
 
             {"LLM_NAME": "mistralai/Ministral-8B-Instruct-2410"},
             {"LLM_NAME": "mistralai/Mistral-7B-Instruct-v0.3"},
