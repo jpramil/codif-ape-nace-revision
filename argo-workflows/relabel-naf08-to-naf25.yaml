@@ -10,6 +10,14 @@ spec:
         medium: Memory
         sizeLimit: 64Gi
   entrypoint: main
+  arguments:
+    parameters:
+      - name: params-conf-list
+        value: '[
+            {"LLM_NAME": "Qwen/Qwen2.5-32B-Instruct"},
+            {"LLM_NAME": "mistralai/Ministral-8B-Instruct-2410"},
+            {"LLM_NAME": "Qwen/Qwen2.5-32B-Instruct"},
+            ]'
 
   templates:
     - name: main
@@ -17,9 +25,18 @@ spec:
         tasks:
           - name: relabel-naf08-to-naf25
             template: run-relabel
+            arguments:
+              parameters:
+                - name: LLM_NAME
+                  value: "{{item.LLM_NAME}}"
+            # Pass the inputs to the task using "withParam"
+            withParam: "{{workflow.parameters.params-conf-list}}"
 
     # Worker template
     - name: run-relabel
+      inputs:
+        parameters:
+          - name: LLM_NAME
       nodeSelector:
         nvidia.com/gpu.product: "NVIDIA-H100-PCIe"
       container:
@@ -36,7 +53,7 @@ spec:
             pip install -r requirements.txt &&
             export MC_HOST_s3=https://$AWS_ACCESS_KEY_ID:$AWS_SECRET_ACCESS_KEY@$AWS_S3_ENDPOINT &&
             huggingface-cli login --token $HF_TOKEN &&
-            python encode-multivoque.py --experiment_name NACE2025
+            python encode-multivoque.py --experiment_name NACE2025 --llm_name {{inputs.parameters.LLM_NAME}}
 
         volumeMounts:
           - mountPath: /dev/shm
