@@ -10,17 +10,24 @@ from langchain_core.output_parsers import PydanticOutputParser
 from vllm import LLM
 from vllm.sampling_params import SamplingParams
 
-from src.constants.llm import LLM_MODEL, MAX_NEW_TOKEN, TEMPERATURE, TOP_P, REP_PENALTY, MODEL_TO_ARGS
+from src.constants.llm import (
+    LLM_MODEL,
+    MAX_NEW_TOKEN,
+    MODEL_TO_ARGS,
+    REP_PENALTY,
+    TEMPERATURE,
+    TOP_P,
+)
 from src.constants.paths import (
     URL_EXPLANATORY_NOTES,
+    URL_GROUND_TRUTH,
     URL_MAPPING_TABLE,
     URL_SIRENE4_EXTRACTION,
     URL_SIRENE4_MULTIVOCAL,
-    URL_GROUND_TRUTH,
 )
 from src.constants.prompting import MODEL_TO_PROMPT_FORMAT
 from src.llm.model import cache_model_from_hf_hub
-from src.llm.prompting import generate_prompt, apply_template
+from src.llm.prompting import apply_template, generate_prompt
 from src.llm.response import LLMResponse, process_response
 from src.mappings.mappings import get_mapping
 from src.utils.data import get_file_system
@@ -29,6 +36,7 @@ from src.utils.data import get_file_system
 def encore_multivoque(
     experiment_name: str,
     run_name: str,
+    llm_name: str = LLM_MODEL,
 ):
     parser = PydanticOutputParser(pydantic_object=LLMResponse)
     fs = get_file_system()
@@ -86,10 +94,10 @@ def encore_multivoque(
     )
 
     # TODO: Temp to only run data that has been manually coded
-    data = data.loc[data["liasse_numero"].isin(ground_truth["liasse_numero"].sample(10).tolist())]
+    data = data.loc[data["liasse_numero"].isin(ground_truth["liasse_numero"].tolist())]
 
     cache_model_from_hf_hub(
-        LLM_MODEL,
+        llm_name,
     )
 
     sampling_params = SamplingParams(
@@ -97,16 +105,14 @@ def encore_multivoque(
         temperature=TEMPERATURE,
         top_p=TOP_P,
         repetition_penalty=REP_PENALTY,
+        seed=2025,
     )
 
-    llm = LLM(
-        model=LLM_MODEL,
-        **MODEL_TO_ARGS.get(LLM_MODEL, {})
-    )
+    llm = LLM(model=llm_name, **MODEL_TO_ARGS.get(llm_name, {}))
 
     prompts = [generate_prompt(row, mapping_multivocal, parser) for row in data.itertuples()]
 
-    batch_prompts = apply_template([p.prompt for p in prompts], MODEL_TO_PROMPT_FORMAT[LLM_MODEL])
+    batch_prompts = apply_template([p.prompt for p in prompts], MODEL_TO_PROMPT_FORMAT[llm_name])
 
     mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI"))
     mlflow.set_experiment(experiment_name)
@@ -121,27 +127,27 @@ def encore_multivoque(
         ]
 
         results_df = data.merge(pd.DataFrame(results), on="liasse_numero").loc[
-                :,
-                [
-                    "liasse_numero",
-                    "apet_finale",
-                    "nace2025",
-                    "libelle_activite",
-                    "activ_sec_agri_et",
-                    "activ_nat_lib_et",
-                    "evenement_type",
-                    "cj",
-                    "activ_nat_et",
-                    "liasse_type",
-                    "activ_surf_et",
-                    "nace08_valid",
-                    "codable",
-                ],
-            ]
+            :,
+            [
+                "liasse_numero",
+                "apet_finale",
+                "nace2025",
+                "libelle_activite",
+                "activ_sec_agri_et",
+                "activ_nat_lib_et",
+                "evenement_type",
+                "cj",
+                "activ_nat_et",
+                "liasse_type",
+                "activ_surf_et",
+                "nace08_valid",
+                "codable",
+            ],
+        ]
 
         pq.write_to_dataset(
             pa.Table.from_pandas(results_df),
-            root_path=f"{URL_SIRENE4_MULTIVOCAL}/{"--".join(LLM_MODEL.split("/"))}",
+            root_path=f"{URL_SIRENE4_MULTIVOCAL}/{"--".join(llm_name.split("/"))}",
             partition_cols=["nace08_valid", "codable"],
             basename_template="part-{i}.parquet",
             existing_data_behavior="overwrite_or_ignore",
@@ -155,39 +161,56 @@ def encore_multivoque(
         )
 
         mlflow.log_param("num_not_coded", len(results_df) - results_df["codable"].sum())
-        mlflow.log_param("pct_not_coded", round((len(results_df) - results_df["codable"].sum())/len(results_df) * 100, 2))
+        mlflow.log_param(
+            "pct_not_coded",
+            round((len(results_df) - results_df["codable"].sum()) / len(results_df) * 100, 2),
+        )
 
         # Keep only rows coded by the model
         results_df_subset = results_df[results_df["codable"]]
 
         results_df_subset = ground_truth.merge(
-            results_df_subset[["liasse_numero", "apet_finale",	"nace2025", "nace08_valid",	"codable"]], on="liasse_numero")
+            results_df_subset[
+                ["liasse_numero", "apet_finale", "nace2025", "nace08_valid", "codable"]
+            ],
+            on="liasse_numero",
+        )
 
         accuracies = {
             f"accuracy_lvl_{i}": round(
-                (results_df_subset["apet_manual"].str[:i] == results_df_subset["nace2025"].str[:i]).mean() * 100, 2
+                (
+                    results_df_subset["apet_manual"].str[:i]
+                    == results_df_subset["nace2025"].str[:i]
+                ).mean()
+                * 100,
+                2,
             )
             for i in [5, 4, 3, 2, 1]
         }
         for metric, value in accuracies.items():
             mlflow.log_metric(metric, value)
 
-        mlflow.log_param("LLM_MODEL", LLM_MODEL)
+        mlflow.log_param("LLM_MODEL", llm_name)
         mlflow.log_param("TEMPERATURE", TEMPERATURE)
         mlflow.log_param("TOP_P", TOP_P)
         mlflow.log_param("REP_PENALTY", REP_PENALTY)
         mlflow.log_param("input_path", URL_SIRENE4_EXTRACTION)
         mlflow.log_param(
-            "output_path", f"{URL_SIRENE4_MULTIVOCAL}/{"--".join(LLM_MODEL.split("/"))}"
+            "output_path", f"{URL_SIRENE4_MULTIVOCAL}/{"--".join(llm_name.split("/"))}"
         )
 
-        failed_to_log = results_df_subset[results_df_subset["apet_manual"].str[:1] != results_df_subset["nace2025"].str[:1]].loc[:20, ["liasse_numero", "libelle", "apet_manual", "nace2025", "activ_nat_lib_et", "codable"]]
+        failed_to_log = results_df_subset[
+            results_df_subset["apet_manual"].str[:1] != results_df_subset["nace2025"].str[:1]
+        ].loc[
+            :20,
+            ["liasse_numero", "libelle", "apet_manual", "nace2025", "activ_nat_lib_et", "codable"],
+        ]
         mlflow.log_table(
             data=failed_to_log,
             artifact_file="sample_misclassified.json",
         )
 
-        
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Recode into NACE2025 nomenclature")
 
@@ -206,6 +229,13 @@ if __name__ == "__main__":
         type=str,
         default=None,
         help="Run name in MLflow",
+    )
+    parser.add_argument(
+        "--llm_name",
+        type=str,
+        default=LLM_MODEL,
+        help="LLM model name",
+        choices=MODEL_TO_ARGS.keys(),
     )
 
     args = parser.parse_args()

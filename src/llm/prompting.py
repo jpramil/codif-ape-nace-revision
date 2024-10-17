@@ -1,8 +1,7 @@
-from collections import namedtuple, defaultdict
 import re
+from collections import defaultdict, namedtuple
 
 from src.constants.prompting import CLASSIF_PROMPT, SYS_PROMPT
-
 
 PromptData = namedtuple("PromptData", ["id", "proposed_codes", "prompt"])
 
@@ -22,7 +21,7 @@ def format_code08(codes: list):
 
 def extract_info(nace2025, paragraphs: list[str]):
     info = [
-        re.sub(r' voir \d{2}\.\d{2}[A-Z]?', '', getattr(nace2025, paragraph))
+        re.sub(r" voir \d{2}\.\d{2}[A-Z]?", "", getattr(nace2025, paragraph))
         for paragraph in paragraphs
         if getattr(nace2025, paragraph) is not None
     ]
@@ -31,7 +30,9 @@ def extract_info(nace2025, paragraphs: list[str]):
 
 def generate_prompt(row, mapping, parser):
     nace08 = row.apet_finale
-    activity = row.libelle_activite.lower() if row.libelle_activite.isupper() else row.libelle_activite
+    activity = (
+        row.libelle_activite.lower() if row.libelle_activite.isupper() else row.libelle_activite
+    )
     row_id = row.liasse_numero
 
     proposed_codes = next((m.naf2025 for m in mapping if m.code == nace08))
@@ -39,7 +40,9 @@ def generate_prompt(row, mapping, parser):
         **{
             "activity": activity,
             "nace08": format_code08([next((m for m in mapping if m.code == nace08))]),
-            "proposed_codes": format_code25(proposed_codes, paragraphs=["include", "not_include", "notes"]),
+            "proposed_codes": format_code25(
+                proposed_codes, paragraphs=["include", "not_include", "notes"]
+            ),
             "format_instructions": parser.get_format_instructions(),
         }
     )
@@ -56,9 +59,9 @@ def generate_prompt(row, mapping, parser):
 def apply_template(messages, template):
     # Define an inner function to handle the core logic for one list of messages
     def format_single_prompt(message_list):
-        prompt_data = {f"{message['role']}_prompt": message['content'] for message in message_list}
+        prompt_data = {f"{message['role']}_prompt": message["content"] for message in message_list}
         return template.format_map(defaultdict(str, prompt_data))
-    
+
     # Check if input is a list of lists
     if isinstance(messages[0], list):
         # It's a list of lists, return a list of formatted prompts
