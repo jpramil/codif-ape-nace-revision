@@ -160,6 +160,7 @@ def encore_multivoque(
             .to_pandas()
         )
 
+        mlflow.log_param("num_coded", results_df["codable"].sum())
         mlflow.log_param("num_not_coded", len(results_df) - results_df["codable"].sum())
         mlflow.log_param(
             "pct_not_coded",
