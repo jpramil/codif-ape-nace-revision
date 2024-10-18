@@ -58,6 +58,7 @@ spec:
             git clone https://github.com/InseeFrLab/codif-ape-nace-revision.git &&
             cd codif-ape-nace-revision/ &&
             pip install -r requirements.txt &&
+            cd .. && git clone https://github.com/AutoGPTQ/AutoGPTQ && pip install -e . && cd ../codif-ape-nace-revision/
             export MC_HOST_s3=https://$AWS_ACCESS_KEY_ID:$AWS_SECRET_ACCESS_KEY@$AWS_S3_ENDPOINT &&
             huggingface-cli login --token $HF_TOKEN &&
             python encode-multivoque.py --experiment_name NACE2025 --llm_name {{inputs.parameters.LLM_NAME}}

@@ -38,6 +38,7 @@ def process_response(response: str, prompt: PromptData, parser: PydanticOutputPa
             f"Error processing row with id {prompt.id}: Code not in the provided list --> {validated_response.nace2025}"
         )
         validated_response.codable = False
+        validated_response.nace2025 = None
 
     return {
         **validated_response.dict(),
