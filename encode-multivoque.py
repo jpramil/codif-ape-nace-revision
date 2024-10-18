@@ -161,7 +161,7 @@ def encore_multivoque(
         ]
 
         # Fill missing values with undefined for nace08 for parquet partition compatibility
-        results_df["nace08_valid"] = results_df["nace08_valid"].fillna("undefined")
+        results_df["nace08_valid"] = results_df["nace08_valid"].fillna("undefined").astype(str)
 
         pq.write_to_dataset(
             pa.Table.from_pandas(results_df),

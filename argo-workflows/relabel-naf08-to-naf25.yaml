@@ -23,7 +23,7 @@ spec:
 
             {"LLM_NAME": "neuralmagic/Llama-3.1-Nemotron-70B-Instruct-HF-FP8-dynamic"},
             {"LLM_NAME": "meta-llama/Meta-Llama-3.1-8B-Instruct"},
-            {"LLM_NAME": "hugging-quants/Meta-Llama-3.1-70B-Instruct-GPTQ-INT4"},
+            {"LLM_NAME": "hugging-quants/Meta-Llama-3.1-70B-Instruct-GPTQ-INT4"}
             ]'
 
   templates:
@@ -47,7 +47,7 @@ spec:
       nodeSelector:
         nvidia.com/gpu.product: "NVIDIA-H100-PCIe"
       container:
-        image: inseefrlab/onyxia-vscode-pytorch:py3.12.4-gpu
+        image: inseefrlab/onyxia-vscode-pytorch:py3.12.6-gpu
         imagePullPolicy: Always
         resources:
           limits:
