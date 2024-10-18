@@ -53,12 +53,12 @@ def format_explanatory_notes(explanatory_notes: str) -> str:
         explanatory_notes.iloc[:, [6, 9, 10, 11, 12, 13, 7, 8]]
         .rename(
             columns={
-                "Code.NACE.Rev.2.1": "naf08_niv4",
+                "Code NAF 2025": "naf08_niv4",
                 "Titre": "lib_naf08_niv5",
                 "Note.générale": "notes",
             }
         )
-        .assign(naf08_niv4=explanatory_notes["Code.NACE.Rev.2.1"].str.replace(".", "", regex=False))
+        .assign(naf08_niv4=explanatory_notes["Code NAF 2025"].str.replace(".", "", regex=False))
     )
 
 
@@ -95,16 +95,7 @@ def find_explanatory_notes(
 
     # If doesn't exist, try to find level 4 naf code in explanatory_notes (remove the last character)
     if row.empty:
-        row = explanatory_notes.loc[explanatory_notes[naf_code_column] == code25[:-1]]
-
-        # If multiple or no matches, further filter based on 'indic.NAF' (or other criteria)
-        if row.shape[0] != 1:
-            row = explanatory_notes.loc[
-                (explanatory_notes[naf_code_column] == code25[:-1])
-                & (explanatory_notes["indic.NAF"] == "1")
-            ]
-            if row.shape[0] != 1:
-                raise ValueError(f"Could not find notes for {code25}")
+        raise ValueError(f"Could not find notes for {code25}")
 
     return row.iloc[0]
 
