@@ -3,7 +3,7 @@ import os
 import duckdb
 import pandas as pd
 
-from src.mappings.mappings import create_mapping
+from src.mappings.mappings import get_mapping
 from src.utils.data import get_file_system
 
 
@@ -38,7 +38,7 @@ def encore_univoque(
     with fs.open("s3://projet-ape/NAF-revision/notes-explicatives-naf2025.xlsx") as f:
         notes_ex = pd.read_excel(f, dtype=str)
 
-    mapping = create_mapping(table_corres, notes_ex)
+    mapping = get_mapping(table_corres, notes_ex)
 
     # Select all univoque codes
     univoques = [naf08 for naf08 in mapping.keys() if len(mapping[naf08]["naf25"]) == 1]
