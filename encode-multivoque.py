@@ -105,8 +105,12 @@ def encore_multivoque(
         for naf08, naf25 in zip(ground_truth["NAF2008_code"], ground_truth["apet_manual"])
     ]
 
-    # TODO: Temp to only run data that has been manually coded
-    data = data.loc[data["liasse_numero"].isin(ground_truth["liasse_numero"].tolist())]
+    # TODO: Temp to only run data that has been manually coded + some random data
+    data_ground_truth = data.loc[data["liasse_numero"].isin(ground_truth["liasse_numero"].tolist())]
+    data_not_ground_truth = data.loc[
+        ~data["liasse_numero"].isin(ground_truth["liasse_numero"].tolist())
+    ].sample(100000 - data_ground_truth.shape[0])
+    data = pd.concat([data_ground_truth, data_not_ground_truth], axis=0)
 
     cache_model_from_hf_hub(
         llm_name,
