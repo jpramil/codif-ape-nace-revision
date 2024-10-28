@@ -52,19 +52,19 @@ def encore_univoque(
     # Construct the CASE statement from the dictionary mapping
     case_statement = "CASE "
     for nace08, nace2025 in univoques.items():
-        case_statement += f"WHEN code_naf08 = '{nace08}' THEN '{nace2025}' "
-    case_statement += "ELSE NULL END AS code_naf25"
+        case_statement += f"WHEN apet_finale = '{nace08}' THEN '{nace2025}' "
+    case_statement += "ELSE NULL END AS nace2025"
 
     # SQL query with renamed column and new column using CASE for mapping
     query = f"""
         SELECT
-            *,
-            apet_finale AS code_naf08,
+            liasse_numero,
+            nace2025,
             {case_statement}
         FROM
             read_parquet('{url_source}')
         WHERE
-            code_naf08 IN ('{"', '".join(univoques.keys())}')
+            apet_finale IN ('{"', '".join(univoques.keys())}')
     """
 
     con.execute(
@@ -84,7 +84,7 @@ def encore_univoque(
 
 
 if __name__ == "__main__":
-    URL = "s3://projet-ape/extractions/20240812_sirene4.parquet"
-    URL_OUT = "s3://projet-ape/NAF-revision/relabeled-data/20240812_sirene4_univoques.parquet"
+    URL = "s3://projet-ape/extractions/20241027_sirene4.parquet"
+    URL_OUT = "s3://projet-ape/NAF-revision/relabeled-data/20241027_sirene4_univoques.parquet"
 
     encore_univoque(URL, URL_OUT)
