@@ -1,5 +1,6 @@
 import argparse
 import os
+from datetime import datetime
 
 import duckdb
 import mlflow
@@ -92,11 +93,7 @@ def encore_multivoque(
     ground_truth = (
         pq.ParquetDataset(URL_GROUND_TRUTH.replace("s3://", ""), filesystem=fs).read().to_pandas()
     )
-
-    #  We add apet final in the ground truth
-    ground_truth = ground_truth.merge(
-        data.loc[:, ["liasse_numero", "apet_finale"]], on="liasse_numero"
-    )
+    ground_truth = ground_truth.loc[~ground_truth.duplicated(subset="liasse_numero")]
 
     # Check if the mapping is correct
     def check_mapping(naf08, naf25):
@@ -105,7 +102,7 @@ def encore_multivoque(
     naf08_to_naf2025 = {m.code: [c.code for c in m.naf2025] for m in mapping}
     ground_truth["mapping_ok"] = [
         check_mapping(naf08, naf25)
-        for naf08, naf25 in zip(ground_truth["apet_finale"], ground_truth["apet_manual"])
+        for naf08, naf25 in zip(ground_truth["NAF2008_code"], ground_truth["apet_manual"])
     ]
 
     # TODO: Temp to only run data that has been manually coded
@@ -145,7 +142,6 @@ def encore_multivoque(
             :,
             [
                 "liasse_numero",
-                "apet_finale",
                 "nace2025",
                 "libelle_activite",
                 "activ_sec_agri_et",
@@ -163,11 +159,12 @@ def encore_multivoque(
         # Fill missing values with undefined for nace08 for parquet partition compatibility
         results_df["nace08_valid"] = results_df["nace08_valid"].fillna("undefined").astype(str)
 
+        date = datetime.now().strftime("%Y-%m-%d--%H:%M")
         pq.write_to_dataset(
             pa.Table.from_pandas(results_df),
             root_path=f"{URL_SIRENE4_MULTIVOCAL}/{"--".join(llm_name.split("/"))}",
             partition_cols=["nace08_valid", "codable"],
-            basename_template="part-{i}.parquet",
+            basename_template=f"part-{{i}}{f'--{date}'}.parquet",  # Filename template for Parquet parts
             existing_data_behavior="overwrite_or_ignore",
             filesystem=fs,
         )
@@ -179,42 +176,45 @@ def encore_multivoque(
             round((len(results_df) - results_df["codable"].sum()) / len(results_df) * 100, 2),
         )
 
-        # Keep only rows coded by the model
-        results_df_subset = results_df[results_df["codable"]]
-
-        results_df_subset = ground_truth.merge(
-            results_df_subset[
-                ["liasse_numero", "apet_finale", "nace2025", "nace08_valid", "codable"]
-            ],
+        results_df = ground_truth.merge(
+            results_df[["liasse_numero", "nace2025", "nace08_valid", "codable"]],
             on="liasse_numero",
         )
 
         accuracies_overall = {
             f"accuracy_overall_lvl_{i}": round(
-                (
-                    results_df_subset["apet_manual"].str[:i]
-                    == results_df_subset["nace2025"].str[:i]
-                ).mean()
-                * 100,
+                (results_df["apet_manual"].str[:i] == results_df["nace2025"].str[:i]).mean() * 100,
                 2,
             )
             for i in [5, 4, 3, 2, 1]
         }
 
         # Accuracies when mapping is correct (true code is in the proposed list for the llm)
-        mlflow.log_param("mapping_ok", results_df_subset["mapping_ok"].sum())
+        mlflow.log_param("mapping_ok", results_df["mapping_ok"].sum())
         accuracies_llm = {
             f"accuracy_llm_lvl_{i}": round(
                 (
-                    results_df_subset[results_df_subset["mapping_ok"]]["apet_manual"].str[:i]
-                    == results_df_subset[results_df_subset["mapping_ok"]]["nace2025"].str[:i]
+                    results_df[results_df["mapping_ok"]]["apet_manual"].str[:i]
+                    == results_df[results_df["mapping_ok"]]["nace2025"].str[:i]
                 ).mean()
                 * 100,
                 2,
             )
             for i in [5, 4, 3, 2, 1]
         }
-        for metric, value in (accuracies_overall | accuracies_llm).items():
+
+        accuracies_codable = {
+            f"accuracy_codable_lvl_{i}": round(
+                (
+                    results_df[results_df["codable"]]["apet_manual"].str[:i]
+                    == results_df[results_df["codable"]]["nace2025"].str[:i]
+                ).mean()
+                * 100,
+                2,
+            )
+            for i in [5, 4, 3, 2, 1]
+        }
+        for metric, value in (accuracies_overall | accuracies_llm | accuracies_codable).items():
             mlflow.log_metric(metric, value)
 
         mlflow.log_param("LLM_MODEL", llm_name)
@@ -223,18 +223,8 @@ def encore_multivoque(
         mlflow.log_param("REP_PENALTY", REP_PENALTY)
         mlflow.log_param("input_path", URL_SIRENE4_EXTRACTION)
         mlflow.log_param(
-            "output_path", f"{URL_SIRENE4_MULTIVOCAL}/{"--".join(llm_name.split("/"))}"
-        )
-
-        failed_to_log = results_df_subset[
-            results_df_subset["apet_manual"].str[:1] != results_df_subset["nace2025"].str[:1]
-        ].loc[
-            :20,
-            ["liasse_numero", "libelle", "apet_manual", "nace2025", "activ_nat_lib_et", "codable"],
-        ]
-        mlflow.log_table(
-            data=failed_to_log,
-            artifact_file="sample_misclassified.json",
+            "output_path",
+            f"{URL_SIRENE4_MULTIVOCAL}/{"--".join(llm_name.split("/"))}/part-0--{date}.parquet",
         )
 
 
