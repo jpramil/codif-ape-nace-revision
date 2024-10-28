@@ -3,6 +3,10 @@ import os
 import duckdb
 import pandas as pd
 
+from src.constants.paths import (
+    URL_EXPLANATORY_NOTES,
+    URL_MAPPING_TABLE,
+)
 from src.mappings.mappings import get_mapping
 from src.utils.data import get_file_system
 
@@ -32,23 +36,23 @@ def encore_univoque(
     fs = get_file_system()
 
     # Load excel files containing informations about mapping
-    with fs.open("s3://projet-ape/NAF-revision/table-correspondance-naf2025.xls") as f:
+    with fs.open(URL_MAPPING_TABLE) as f:
         table_corres = pd.read_excel(f, dtype=str)
 
-    with fs.open("s3://projet-ape/NAF-revision/notes-explicatives-naf2025.xlsx") as f:
+    with fs.open(URL_EXPLANATORY_NOTES) as f:
         notes_ex = pd.read_excel(f, dtype=str)
 
-    mapping = get_mapping(table_corres, notes_ex)
+    mapping = get_mapping(notes_ex, table_corres)
 
     # Select all univoque codes
-    univoques = [naf08 for naf08 in mapping.keys() if len(mapping[naf08]["naf25"]) == 1]
+    univoques = {code.code: code.naf2025[0].code for code in mapping if len(code.naf2025) == 1}
 
     con = duckdb.connect(database=":memory:")
 
     # Construct the CASE statement from the dictionary mapping
     case_statement = "CASE "
-    for key, value in mapping.items():
-        case_statement += f"WHEN code_naf08 = '{key}' THEN '{[*value["naf25"]][0]}' "
+    for nace08, nace2025 in univoques.items():
+        case_statement += f"WHEN code_naf08 = '{nace08}' THEN '{nace2025}' "
     case_statement += "ELSE NULL END AS code_naf25"
 
     # SQL query with renamed column and new column using CASE for mapping
@@ -60,7 +64,7 @@ def encore_univoque(
         FROM
             read_parquet('{url_source}')
         WHERE
-            code_naf08 IN ('{"', '".join(univoques)}')
+            code_naf08 IN ('{"', '".join(univoques.keys())}')
     """
 
     con.execute(
