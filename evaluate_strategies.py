@@ -6,6 +6,7 @@ from src.constants.paths import (
     URL_GROUND_TRUTH,
     URL_MAPPING_TABLE,
     URL_SIRENE4_MULTIVOCAL,
+    URL_SIRENE4_MULTIVOCAL_FINAL,
 )
 from src.mappings.mappings import get_mapping
 from src.utils.data import get_file_system, merge_dataframes
@@ -27,9 +28,8 @@ LLMS = [
     "hugging-quants--Meta-Llama-3.1-70B-Instruct-GPTQ-INT4",
     "neuralmagic--Llama-3.1-Nemotron-70B-Instruct-HF-FP8-dynamic",
     "Qwen--Qwen2.5-72B-Instruct-GPTQ-Int4",
-    "mistralai/Ministral-8B-Instruct-2410",
 ]
-WEIGHTS = [1, 1, 1, 1]
+WEIGHTS = [1, 1, 1]
 VAR_TO_KEEP = ["liasse_numero", "nace2025", "codable"]
 
 df_dict = {
@@ -52,6 +52,8 @@ df_dict["hugging-quants"] = df_dict["hugging-quants"].loc[
 df_dict["neuralmagic"] = df_dict["neuralmagic"].loc[
     df_dict["neuralmagic"]["liasse_numero"].isin(df_dict["hugging-quants"]["liasse_numero"])
 ]
+
+###
 
 merged_df = merge_dataframes(
     df_dict,
@@ -140,3 +142,16 @@ print(f"Raw accuracies : {accuracies_raw}\n\n")
 print(f"Codable accuracies : {accuracies_codable}\n\n")
 print(f"Raw LLM accuracies : {accuracies_raw_llm}\n\n")
 print(f"---------------------------------\nSTATISTIQUES\n {stats}\n\n")
+
+best_strategy = [
+    key
+    for key in accuracies_raw
+    if key.endswith("lvl_5")
+    and accuracies_raw[key] == max(accuracies_raw[k] for k in accuracies_raw if k.endswith("lvl_5"))
+]
+
+final_df = results_df.loc[
+    :, ["liasse_numero", f"{best_strategy[0].replace('accuracy_', '').replace('_lvl_5', '')}"]
+].rename(columns={f"{best_strategy[0].replace('accuracy_', '').replace('_lvl_5', '')}": "nace2025"})
+
+final_df.to_parquet(URL_SIRENE4_MULTIVOCAL_FINAL, filesystem=fs)

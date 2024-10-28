@@ -6,15 +6,14 @@ import pandas as pd
 from src.constants.paths import (
     URL_EXPLANATORY_NOTES,
     URL_MAPPING_TABLE,
+    URL_SIRENE4_EXTRACTION,
+    URL_SIRENE4_UNIVOCAL,
 )
 from src.mappings.mappings import get_mapping
 from src.utils.data import get_file_system
 
 
-def encore_univoque(
-    url_source: str,
-    url_out: str,
-):
+def encore_univoque():
     """
     Processes the NAF code mappings and relabels the source dataset with new NAF codes (2025 version)
     for rows with unambiguous mappings (univoque codes), then outputs the result as a Parquet file.
@@ -59,10 +58,9 @@ def encore_univoque(
     query = f"""
         SELECT
             liasse_numero,
-            nace2025,
             {case_statement}
         FROM
-            read_parquet('{url_source}')
+            read_parquet('{URL_SIRENE4_EXTRACTION}')
         WHERE
             apet_finale IN ('{"', '".join(univoques.keys())}')
     """
@@ -76,7 +74,7 @@ def encore_univoque(
 
         COPY
         ({query})
-        TO '{url_out}'
+        TO '{URL_SIRENE4_UNIVOCAL}'
         (FORMAT 'parquet')
     ;
     """
@@ -84,7 +82,4 @@ def encore_univoque(
 
 
 if __name__ == "__main__":
-    URL = "s3://projet-ape/extractions/20241027_sirene4.parquet"
-    URL_OUT = "s3://projet-ape/NAF-revision/relabeled-data/20241027_sirene4_univoques.parquet"
-
-    encore_univoque(URL, URL_OUT)
+    encore_univoque()

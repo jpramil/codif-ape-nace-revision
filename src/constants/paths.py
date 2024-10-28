@@ -1,5 +1,11 @@
 URL_SIRENE4_EXTRACTION = "s3://projet-ape/extractions/20241027_sirene4.parquet"
 URL_SIRENE4_MULTIVOCAL = "s3://projet-ape/NAF-revision/relabeled-data"
+URL_SIRENE4_UNIVOCAL = (
+    "s3://projet-ape/NAF-revision/relabeled-data/20241027_sirene4_univoques.parquet"
+)
+URL_SIRENE4_MULTIVOCAL_FINAL = (
+    "s3://projet-ape/NAF-revision/relabeled-data/20241027_sirene4_multivoques.parquet"
+)
 URL_MAPPING_TABLE = "s3://projet-ape/NAF-revision/table-correspondance-naf2025.xls"
 URL_EXPLANATORY_NOTES = "s3://projet-ape/NAF-revision/Notes explicatives NACE et NAF.xlsx"
 URL_GROUND_TRUTH = "s3://projet-ape/label-studio/annotation-campaign-2024/rev-NAF2025/preprocessed/training_data_NAF2025.parquet"
