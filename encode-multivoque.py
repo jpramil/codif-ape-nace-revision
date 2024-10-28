@@ -78,7 +78,7 @@ def encore_multivoque(
         ~data.duplicated(
             subset=[
                 "apet_finale",
-                "libelle_activite",
+                "libelle",
                 "evenement_type",
                 "cj",
                 "activ_nat_et",
@@ -147,7 +147,7 @@ def encore_multivoque(
             [
                 "liasse_numero",
                 "nace2025",
-                "libelle_activite",
+                "libelle",
                 "activ_sec_agri_et",
                 "activ_nat_lib_et",
                 "evenement_type",
