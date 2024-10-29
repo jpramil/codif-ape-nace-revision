@@ -73,17 +73,12 @@ def encore_multivoque(
     # We keep only unique ids
     data = data[~data.duplicated(subset="liasse_numero")]
 
-    # We keep only non duplicated description and complementary variables
+    # We keep only non duplicated description (complementary variables are ignored for the LLM)
     data = data[
         ~data.duplicated(
             subset=[
                 "apet_finale",
                 "libelle",
-                "evenement_type",
-                "cj",
-                "activ_nat_et",
-                "liasse_type",
-                "activ_surf_et",
             ]
         )
     ]
@@ -109,7 +104,7 @@ def encore_multivoque(
     data_ground_truth = data.loc[data["liasse_numero"].isin(ground_truth["liasse_numero"].tolist())]
     data_not_ground_truth = data.loc[
         ~data["liasse_numero"].isin(ground_truth["liasse_numero"].tolist())
-    ].sample(100000 - data_ground_truth.shape[0], random_state=2025)
+    ].sample(300000 - data_ground_truth.shape[0], random_state=2025)
     data = pd.concat([data_ground_truth, data_not_ground_truth], axis=0)
 
     cache_model_from_hf_hub(
@@ -180,26 +175,31 @@ def encore_multivoque(
             round((len(results_df) - results_df["codable"].sum()) / len(results_df) * 100, 2),
         )
 
-        results_df = ground_truth.merge(
-            results_df[["liasse_numero", "nace2025", "nace08_valid", "codable"]],
+        # EVALUATION
+        ground_truth = ground_truth.loc[:, ["liasse_numero", "apet_manual", "mapping_ok"]]
+
+        eval_df = ground_truth.merge(
+            results_df[["liasse_numero", "nace2025", "codable"]],
             on="liasse_numero",
+            how="inner",
         )
+        mlflow.log_param("eval_size", eval_df.shape[0])
 
         accuracies_overall = {
             f"accuracy_overall_lvl_{i}": round(
-                (results_df["apet_manual"].str[:i] == results_df["nace2025"].str[:i]).mean() * 100,
+                (eval_df["apet_manual"].str[:i] == eval_df["nace2025"].str[:i]).mean() * 100,
                 2,
             )
             for i in [5, 4, 3, 2, 1]
         }
 
         # Accuracies when mapping is correct (true code is in the proposed list for the llm)
-        mlflow.log_param("mapping_ok", results_df["mapping_ok"].sum())
+        mlflow.log_param("mapping_ok", eval_df["mapping_ok"].sum())
         accuracies_llm = {
             f"accuracy_llm_lvl_{i}": round(
                 (
-                    results_df[results_df["mapping_ok"]]["apet_manual"].str[:i]
-                    == results_df[results_df["mapping_ok"]]["nace2025"].str[:i]
+                    eval_df[eval_df["mapping_ok"]]["apet_manual"].str[:i]
+                    == eval_df[eval_df["mapping_ok"]]["nace2025"].str[:i]
                 ).mean()
                 * 100,
                 2,
@@ -210,8 +210,8 @@ def encore_multivoque(
         accuracies_codable = {
             f"accuracy_codable_lvl_{i}": round(
                 (
-                    results_df[results_df["codable"]]["apet_manual"].str[:i]
-                    == results_df[results_df["codable"]]["nace2025"].str[:i]
+                    eval_df[eval_df["codable"]]["apet_manual"].str[:i]
+                    == eval_df[eval_df["codable"]]["nace2025"].str[:i]
                 ).mean()
                 * 100,
                 2,
