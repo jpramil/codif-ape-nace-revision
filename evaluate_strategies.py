@@ -25,35 +25,36 @@ def check_mapping(naf08, naf25):
 fs = get_file_system()
 
 LLMS = [
-    "hugging-quants--Meta-Llama-3.1-70B-Instruct-GPTQ-INT4",
-    "neuralmagic--Llama-3.1-Nemotron-70B-Instruct-HF-FP8-dynamic",
-    "Qwen--Qwen2.5-72B-Instruct-GPTQ-Int4",
+    "mistralai--Ministral-8B-Instruct-2410",
+    "mistralai--Mistral-Small-Instruct-2409",
+    "Qwen--Qwen2.5-32B-Instruct",
 ]
 WEIGHTS = [1, 1, 1]
+DATE_VERSION = ["2024-10-28--19:45", "2024-10-29--03:39", "2024-10-29--06:18"]
 VAR_TO_KEEP = ["liasse_numero", "nace2025", "codable"]
 
-df_dict = {
-    llm_name.split("/")[0].split("--")[0]: pq.ParquetDataset(
-        f"{URL_SIRENE4_MULTIVOCAL.replace("s3://", "")}/{"--".join(llm_name.split("/"))}",
+
+df_dict = {}
+for i, llm_name in enumerate(LLMS):
+    dataset = pq.ParquetDataset(
+        f"{URL_SIRENE4_MULTIVOCAL.replace('s3://', '')}/{llm_name}",
         filesystem=fs,
     )
-    .read()
-    .to_pandas()
+    df_dict[llm_name] = (
+        pq.ParquetDataset(
+            [f for f in dataset.files if f"part-0--{DATE_VERSION[i]}" in f], filesystem=fs
+        )
+        .read()
+        .to_pandas()
+    )
+
+list_id = set.intersection(
+    *map(set, [df_dict[llm_name]["liasse_numero"].tolist() for llm_name in LLMS])
+)
+df_dict = {
+    llm_name: df_dict[llm_name].loc[df_dict[llm_name]["liasse_numero"].isin(list_id)]
     for llm_name in LLMS
 }
-
-# TODO : TEMP
-df_dict["Qwen"] = df_dict["Qwen"].loc[
-    df_dict["Qwen"]["liasse_numero"].isin(df_dict["hugging-quants"]["liasse_numero"])
-]
-df_dict["hugging-quants"] = df_dict["hugging-quants"].loc[
-    df_dict["hugging-quants"]["liasse_numero"].isin(df_dict["Qwen"]["liasse_numero"])
-]
-df_dict["neuralmagic"] = df_dict["neuralmagic"].loc[
-    df_dict["neuralmagic"]["liasse_numero"].isin(df_dict["hugging-quants"]["liasse_numero"])
-]
-
-###
 
 merged_df = merge_dataframes(
     df_dict,
@@ -71,11 +72,10 @@ merged_df["weighted_voting_label"] = select_labels_weighted_voting(
     merged_df, model_columns, weights
 )
 
-
 ground_truth = (
     pq.ParquetDataset(URL_GROUND_TRUTH.replace("s3://", ""), filesystem=fs).read().to_pandas()
 )
-# TODO: TEMP DUPLICATED
+# TODO: TEMP REMOVE DUPLICATED
 ground_truth = ground_truth.loc[~ground_truth.duplicated(subset="liasse_numero")]
 
 with fs.open(URL_MAPPING_TABLE) as f:
@@ -92,16 +92,13 @@ ground_truth["mapping_ok"] = [
     check_mapping(naf08, naf25)
     for naf08, naf25 in zip(ground_truth["NAF2008_code"], ground_truth["apet_manual"])
 ]
+ground_truth = ground_truth.loc[:, ["liasse_numero", "apet_manual", "mapping_ok"]]
 
-
-results_df = merged_df.merge(
-    ground_truth.loc[:, ["liasse_numero", "NAF2008_code", "apet_manual", "mapping_ok"]],
-    on="liasse_numero",
-)
+eval_df = merged_df.merge(ground_truth, on="liasse_numero", how="inner")
 
 accuracies_raw = {
     f"accuracy_{model.replace("nace2025_", "")}_lvl_{i}": round(
-        (results_df["apet_manual"].str[:i] == results_df[f"{model}"].str[:i]).mean() * 100,
+        (eval_df["apet_manual"].str[:i] == eval_df[f"{model}"].str[:i]).mean() * 100,
         2,
     )
     for i in [5, 4, 3, 2, 1]
@@ -112,8 +109,8 @@ accuracies_raw = {
 accuracies_codable = {
     f"accuracy_{model}_lvl_{i}": round(
         (
-            results_df[results_df[f"codable_{model}"] == "true"]["apet_manual"].str[:i]
-            == results_df[results_df[f"codable_{model}"] == "true"][f"nace2025_{model}"].str[:i]
+            eval_df[eval_df[f"codable_{model}"] == "true"]["apet_manual"].str[:i]
+            == eval_df[eval_df[f"codable_{model}"] == "true"][f"nace2025_{model}"].str[:i]
         ).mean()
         * 100,
         2,
@@ -125,8 +122,8 @@ accuracies_codable = {
 accuracies_raw_llm = {
     f"accuracy_{model.replace("nace2025_", "")}_lvl_{i}": round(
         (
-            results_df[results_df["mapping_ok"]]["apet_manual"].str[:i]
-            == results_df[results_df["mapping_ok"]][f"{model}"].str[:i]
+            eval_df[eval_df["mapping_ok"]]["apet_manual"].str[:i]
+            == eval_df[eval_df["mapping_ok"]][f"{model}"].str[:i]
         ).mean()
         * 100,
         2,
@@ -136,7 +133,7 @@ accuracies_raw_llm = {
     + ["cascade_label", "voting_label", "weighted_voting_label"]
 }
 
-stats = get_model_agreement_stats(results_df, model_columns)
+stats = get_model_agreement_stats(eval_df, model_columns)
 
 print(f"Raw accuracies : {accuracies_raw}\n\n")
 print(f"Codable accuracies : {accuracies_codable}\n\n")
@@ -150,7 +147,7 @@ best_strategy = [
     and accuracies_raw[key] == max(accuracies_raw[k] for k in accuracies_raw if k.endswith("lvl_5"))
 ]
 
-final_df = results_df.loc[
+final_df = merged_df.loc[
     :, ["liasse_numero", f"{best_strategy[0].replace('accuracy_', '').replace('_lvl_5', '')}"]
 ].rename(columns={f"{best_strategy[0].replace('accuracy_', '').replace('_lvl_5', '')}": "nace2025"})
 
