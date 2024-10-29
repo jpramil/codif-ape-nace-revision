@@ -109,7 +109,7 @@ def encore_multivoque(
     data_ground_truth = data.loc[data["liasse_numero"].isin(ground_truth["liasse_numero"].tolist())]
     data_not_ground_truth = data.loc[
         ~data["liasse_numero"].isin(ground_truth["liasse_numero"].tolist())
-    ].sample(100000 - data_ground_truth.shape[0])
+    ].sample(100000 - data_ground_truth.shape[0], random_state=2025)
     data = pd.concat([data_ground_truth, data_not_ground_truth], axis=0)
 
     cache_model_from_hf_hub(
