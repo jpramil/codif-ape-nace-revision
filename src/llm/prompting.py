@@ -21,7 +21,11 @@ def format_code08(codes: list):
 
 def extract_info(nace2025, paragraphs: list[str]):
     info = [
-        re.sub(r" voir \d{2}\.\d{2}[A-Z]?", "", getattr(nace2025, paragraph))
+        re.sub(
+            r"\d{2}\.\d{2}[A-Z]?|\d{2}\.\d{1}[A-Z]?|, voir groupe|, voir",
+            "",
+            getattr(nace2025, paragraph),
+        )
         for paragraph in paragraphs
         if getattr(nace2025, paragraph) is not None
     ]
@@ -32,6 +36,14 @@ def generate_prompt(row, mapping, parser):
     nace08 = row.apet_finale
     activity = row.libelle.lower() if row.libelle.isupper() else row.libelle
     row_id = row.liasse_numero
+
+    specs_agriculture = row.activ_sec_agri_et
+    specs_nature = row.activ_nat_lib_et
+
+    if specs_agriculture is not None:
+        activity += f"\nPrécisions sur l'activité agricole : {specs_agriculture.lower()}"
+    if specs_nature is not None:
+        activity += f"\nAutre nature d'activité : {specs_nature.lower()}"
 
     proposed_codes = next((m.naf2025 for m in mapping if m.code == nace08))
     prompt = CLASSIF_PROMPT.format(

@@ -42,6 +42,20 @@ def encore_multivoque(
     parser = PydanticOutputParser(pydantic_object=LLMResponse)
     fs = get_file_system()
 
+    VAR_TO_KEEP = [
+        "liasse_numero",
+        "apet_finale",
+        "libelle",
+        "evenement_type",
+        "cj",
+        "activ_nat_et",
+        "liasse_type",
+        "activ_surf_et",
+        "activ_sec_agri_et",
+        "activ_nat_lib_et",
+        "activ_perm_et",
+    ]
+
     # Load excel files containing informations about mapping
     with fs.open(URL_MAPPING_TABLE) as f:
         table_corres = pd.read_excel(f, dtype=str)
@@ -53,8 +67,9 @@ def encore_multivoque(
     mapping_multivocal = [code for code in mapping if len(code.naf2025) > 1]
 
     con = duckdb.connect(database=":memory:")
-    data = con.query(
-        f"""
+    data = (
+        con.query(
+            f"""
         SET s3_endpoint='{os.getenv("AWS_S3_ENDPOINT")}';
         SET s3_access_key_id='{os.getenv("AWS_ACCESS_KEY_ID")}';
         SET s3_secret_access_key='{os.getenv("AWS_SECRET_ACCESS_KEY")}';
@@ -68,20 +83,18 @@ def encore_multivoque(
             apet_finale IN ('{"', '".join([m.code for m in mapping_multivocal])}')
     ;
     """
-    ).to_df()
+        )
+        .to_df()
+        .loc[:, VAR_TO_KEEP]
+    )
 
     # We keep only unique ids
     data = data.drop_duplicates(subset="liasse_numero")
 
-    # We keep only non duplicated description (complementary variables are ignored for the LLM)
-    data = data[
-        ~data.duplicated(
-            subset=[
-                "apet_finale",
-                "libelle",
-            ]
-        )
-    ]
+    # We keep only non duplicated description and complementary variables
+    data = data.drop_duplicates(
+        subset=[v for v in VAR_TO_KEEP if v != "liasse_numero" and v != "apet_finale"]
+    )
     data.reset_index(drop=True, inplace=True)
     con.close()
 
@@ -100,12 +113,12 @@ def encore_multivoque(
         for naf08, naf25 in zip(ground_truth["NAF2008_code"], ground_truth["apet_manual"])
     ]
 
-    # TODO: Temp to only run data that has been manually coded + some random data
-    data_ground_truth = data.loc[data["liasse_numero"].isin(ground_truth["liasse_numero"].tolist())]
-    data_not_ground_truth = data.loc[
-        ~data["liasse_numero"].isin(ground_truth["liasse_numero"].tolist())
-    ].sample(300000 - data_ground_truth.shape[0], random_state=2025)
-    data = pd.concat([data_ground_truth, data_not_ground_truth], axis=0)
+    # # TODO: Temp to only run data that has been manually coded + some random data
+    # data_ground_truth = data.loc[data["liasse_numero"].isin(ground_truth["liasse_numero"].tolist())]
+    # data_not_ground_truth = data.loc[
+    #     ~data["liasse_numero"].isin(ground_truth["liasse_numero"].tolist())
+    # ].sample(300000 - data_ground_truth.shape[0], random_state=2025)
+    # data = pd.concat([data_ground_truth, data_not_ground_truth], axis=0)
 
     cache_model_from_hf_hub(
         llm_name,
@@ -139,17 +152,8 @@ def encore_multivoque(
 
         results_df = data.merge(pd.DataFrame(results), on="liasse_numero").loc[
             :,
-            [
-                "liasse_numero",
-                "nace2025",
-                "libelle",
-                "activ_sec_agri_et",
-                "activ_nat_lib_et",
-                "evenement_type",
-                "cj",
-                "activ_nat_et",
-                "liasse_type",
-                "activ_surf_et",
+            VAR_TO_KEEP
+            + [
                 "nace08_valid",
                 "codable",
             ],
