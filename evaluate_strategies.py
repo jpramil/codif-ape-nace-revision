@@ -76,7 +76,7 @@ ground_truth = (
     pq.ParquetDataset(URL_GROUND_TRUTH.replace("s3://", ""), filesystem=fs).read().to_pandas()
 )
 # TODO: TEMP REMOVE DUPLICATED
-ground_truth = ground_truth.loc[~ground_truth.duplicated(subset="liasse_numero")]
+ground_truth = ground_truth.drop_duplicates(subset="liasse_numero")
 
 with fs.open(URL_MAPPING_TABLE) as f:
     table_corres = pd.read_excel(f, dtype=str)

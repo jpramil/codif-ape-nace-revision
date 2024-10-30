@@ -26,7 +26,7 @@ VAR_TO_KEEP = [
 
 # Pour les univoques, on enleve les doublons de liasse seulement
 data_univocal = pd.read_parquet(URL_SIRENE4_UNIVOCAL, filesystem=fs)
-data_univocal = data_univocal[~data_univocal.duplicated(subset="liasse_numero")]
+data_univocal = data_univocal.drop_duplicates(subset="liasse_numero")
 
 # Pour les multivocaux issue de l'annotation humaine on enleve les doublons de liasse et on renomme la colonne apet_manual en nace2025
 data_multivocal_ground_truth = (
@@ -34,9 +34,7 @@ data_multivocal_ground_truth = (
     .rename(columns={"apet_manual": "nace2025"})
     .loc[:, ["liasse_numero", "nace2025"]]
 )
-data_multivocal_ground_truth = data_multivocal_ground_truth.loc[
-    ~data_multivocal_ground_truth.duplicated(subset="liasse_numero")
-]
+data_multivocal_ground_truth = data_multivocal_ground_truth.drop_duplicates(subset="liasse_numero")
 
 # Pour les multivocaux du LLM on enlève les données qui sont dans l'annotation humaine
 data_multivocal = pd.read_parquet(URL_SIRENE4_MULTIVOCAL_FINAL, filesystem=fs)
@@ -46,7 +44,7 @@ data_multivocal = data_multivocal.loc[
 
 # Pour les données de sirene 4, on enlève les doublons de liasse
 data_sirene4 = pd.read_parquet(URL_SIRENE4_EXTRACTION, filesystem=fs).loc[:, VAR_TO_KEEP]
-data_sirene4 = data_sirene4[~data_sirene4.duplicated(subset="liasse_numero")]
+data_sirene4 = data_sirene4.drop_duplicates(subset="liasse_numero")
 
 # On rajoute les variables annexes aux multivoques, univoques et ground truth contenant l'annotation nace2025
 data_univocal = data_univocal.merge(data_sirene4, on="liasse_numero", how="left")

@@ -71,7 +71,7 @@ def encore_multivoque(
     ).to_df()
 
     # We keep only unique ids
-    data = data[~data.duplicated(subset="liasse_numero")]
+    data = data.drop_duplicates(subset="liasse_numero")
 
     # We keep only non duplicated description (complementary variables are ignored for the LLM)
     data = data[
@@ -88,7 +88,7 @@ def encore_multivoque(
     ground_truth = (
         pq.ParquetDataset(URL_GROUND_TRUTH.replace("s3://", ""), filesystem=fs).read().to_pandas()
     )
-    ground_truth = ground_truth.loc[~ground_truth.duplicated(subset="liasse_numero")]
+    ground_truth = ground_truth.drop_duplicates(subset="liasse_numero")
 
     # Check if the mapping is correct
     def check_mapping(naf08, naf25):
