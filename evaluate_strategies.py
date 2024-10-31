@@ -25,12 +25,16 @@ def check_mapping(naf08, naf25):
 fs = get_file_system()
 
 LLMS = [
-    "mistralai--Ministral-8B-Instruct-2410",
     "mistralai--Mistral-Small-Instruct-2409",
     "Qwen--Qwen2.5-32B-Instruct",
+    "mistralai--Ministral-8B-Instruct-2410",
 ]
 WEIGHTS = [1, 1, 1]
-DATE_VERSION = ["2024-10-28--19:45", "2024-10-29--03:39", "2024-10-29--06:18"]
+DATE_VERSION = [
+    "2024-10-29--03:39",
+    "2024-10-29--06:18",
+    "2024-10-28--19:45",
+]
 VAR_TO_KEEP = ["liasse_numero", "nace2025", "codable"]
 
 
