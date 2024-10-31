@@ -38,6 +38,7 @@ def encore_multivoque(
     experiment_name: str,
     run_name: str,
     llm_name: str = LLM_MODEL,
+    third: int = None,
 ):
     parser = PydanticOutputParser(pydantic_object=LLMResponse)
     fs = get_file_system()
@@ -134,6 +135,17 @@ def encore_multivoque(
 
     llm = LLM(model=llm_name, **MODEL_TO_ARGS.get(llm_name, {}))
 
+    # If third is specified, process only a subset of the data for that third
+    if third is not None:
+        idx_for_subset = [
+            ((data.shape[0] // 3) * (third - 1)),  # Start index for the subset
+            ((data.shape[0] // 3) * third),  # End index for the subset
+        ]
+        idx_for_subset[-1] = (
+            idx_for_subset[-1] if third != 3 else data.shape[0]
+        )  # Adjust for the last third
+        data = data.iloc[idx_for_subset[0] : idx_for_subset[1]]  # Select subset
+
     prompts = [generate_prompt(row, mapping_multivocal, parser) for row in data.itertuples()]
 
     batch_prompts = apply_template([p.prompt for p in prompts], MODEL_TO_PROMPT_FORMAT[llm_name])
@@ -154,6 +166,7 @@ def encore_multivoque(
             :,
             VAR_TO_KEEP
             + [
+                "nace2025",
                 "nace08_valid",
                 "codable",
             ],
@@ -167,7 +180,7 @@ def encore_multivoque(
             pa.Table.from_pandas(results_df),
             root_path=f"{URL_SIRENE4_MULTIVOCAL}/{"--".join(llm_name.split("/"))}",
             partition_cols=["nace08_valid", "codable"],
-            basename_template=f"part-{{i}}{f'--{date}'}.parquet",  # Filename template for Parquet parts
+            basename_template=f"part-{{i}}{f'-{third}' if third else ""}{f'--{date}'}.parquet",  # Filename template for Parquet parts
             existing_data_behavior="overwrite_or_ignore",
             filesystem=fs,
         )
@@ -232,7 +245,7 @@ def encore_multivoque(
         mlflow.log_param("input_path", URL_SIRENE4_EXTRACTION)
         mlflow.log_param(
             "output_path",
-            f"{URL_SIRENE4_MULTIVOCAL}/{"--".join(llm_name.split("/"))}/part-0--{date}.parquet",
+            f"{URL_SIRENE4_MULTIVOCAL}/{"--".join(llm_name.split("/"))}/part-{third if third else 0}--{date}.parquet",
         )
 
 
@@ -261,6 +274,14 @@ if __name__ == "__main__":
         default=LLM_MODEL,
         help="LLM model name",
         choices=MODEL_TO_ARGS.keys(),
+    )
+
+    # Optional argument for specifying the third of the dataset to process
+    parser.add_argument(
+        "--third",
+        type=int,
+        required=False,
+        help="Third of the dataset to process",
     )
 
     args = parser.parse_args()
