@@ -79,9 +79,9 @@ merged_df = merge_dataframes(
 model_columns = [f"nace2025_{model}" for model in df_dict.keys()]
 weights = {f"nace2025_{model}": MODEL_TO_USE[model]["weights"] for model in df_dict.keys()}
 
-merged_df["cascade_label"] = select_labels_cascade(merged_df, model_columns)
-merged_df["voting_label"] = select_labels_voting(merged_df, model_columns)
-merged_df["weighted_voting_label"] = select_labels_weighted_voting(
+merged_df["nace2025_cascade_label"] = select_labels_cascade(merged_df, model_columns)
+merged_df["nace2025_voting_label"] = select_labels_voting(merged_df, model_columns)
+merged_df["nace2025_weighted_voting_label"] = select_labels_weighted_voting(
     merged_df, model_columns, weights
 )
 
@@ -170,6 +170,10 @@ final_df = merged_df.loc[
         "liasse_numero",
         f"nace2025_{best_strategy[0].replace('accuracy_', '').replace('_lvl_5', '')}",
     ],
-].rename(columns={f"{best_strategy[0].replace('accuracy_', '').replace('_lvl_5', '')}": "nace2025"})
+].rename(
+    columns={
+        f"nace2025_{best_strategy[0].replace('accuracy_', '').replace('_lvl_5', '')}": "nace2025"
+    }
+)
 
 final_df.to_parquet(URL_SIRENE4_MULTIVOCAL_FINAL, filesystem=fs)
