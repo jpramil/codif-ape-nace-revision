@@ -135,6 +135,9 @@ def encore_multivoque(
 
     llm = LLM(model=llm_name, **MODEL_TO_ARGS.get(llm_name, {}))
 
+    # Sort data by liasse_numero to ensure reproducibility
+    data = data.sort_values("liasse_numero").reset_index(drop=True)
+
     # If third is specified, process only a subset of the data for that third
     if third is not None:
         idx_for_subset = [
