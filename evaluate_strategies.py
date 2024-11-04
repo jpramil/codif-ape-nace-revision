@@ -23,41 +23,50 @@ def check_mapping(naf08, naf25):
 
 
 fs = get_file_system()
-
-LLMS = [
-    "mistralai--Mistral-Small-Instruct-2409",
-    "Qwen--Qwen2.5-32B-Instruct",
-    "mistralai--Ministral-8B-Instruct-2410",
-]
-WEIGHTS = [1, 1, 1]
-DATE_VERSION = [
-    "2024-10-29--03:39",
-    "2024-10-29--06:18",
-    "2024-10-28--19:45",
-]
 VAR_TO_KEEP = ["liasse_numero", "nace2025", "codable"]
 
+MODEL_TO_USE = {
+    "mistralai--Ministral-8B-Instruct-2410": {
+        "weights": 1,
+        "date_version": ["2024-11-01--00:55", "2024-11-01--00:57", "2024-11-01--00:50"],
+    },
+    "mistralai--Mistral-Small-Instruct-2409": {
+        "weights": 1,
+        "date_version": ["2024-11-02--02:50", "2024-11-02--03:47", "2024-11-02--04:16"],
+    },
+    "Qwen--Qwen2.5-32B-Instruct": {
+        "weights": 1,
+        "date_version": ["2024-11-02--08:01", "2024-11-03--13:45", "2024-11-03--15:46"],
+    },
+}
 
 df_dict = {}
-for i, llm_name in enumerate(LLMS):
+for llm_name in MODEL_TO_USE.keys():
     dataset = pq.ParquetDataset(
         f"{URL_SIRENE4_MULTIVOCAL.replace('s3://', '')}/{llm_name}",
         filesystem=fs,
     )
     df_dict[llm_name] = (
         pq.ParquetDataset(
-            [f for f in dataset.files if f"part-0--{DATE_VERSION[i]}" in f], filesystem=fs
+            [
+                f
+                for f in dataset.files
+                if any(ts in f for ts in MODEL_TO_USE[llm_name]["date_version"])
+            ],
+            filesystem=fs,
         )
         .read()
         .to_pandas()
     )
 
 list_id = set.intersection(
-    *map(set, [df_dict[llm_name]["liasse_numero"].tolist() for llm_name in LLMS])
+    *map(set, [df_dict[llm_name]["liasse_numero"].tolist() for llm_name in MODEL_TO_USE.keys()])
 )
 df_dict = {
-    llm_name: df_dict[llm_name].loc[df_dict[llm_name]["liasse_numero"].isin(list_id)]
-    for llm_name in LLMS
+    llm_name: df_dict[llm_name]
+    .loc[df_dict[llm_name]["liasse_numero"].isin(list_id)]
+    .drop_duplicates(subset=["liasse_numero"])
+    for llm_name in MODEL_TO_USE.keys()
 }
 
 merged_df = merge_dataframes(
@@ -68,7 +77,7 @@ merged_df = merge_dataframes(
 )
 
 model_columns = [f"nace2025_{model}" for model in df_dict.keys()]
-weights = {f"nace2025_{model}": WEIGHTS[i] for i, model in enumerate(df_dict.keys())}
+weights = {f"nace2025_{model}": MODEL_TO_USE[model]["weights"] for model in df_dict.keys()}
 
 merged_df["cascade_label"] = select_labels_cascade(merged_df, model_columns)
 merged_df["voting_label"] = select_labels_voting(merged_df, model_columns)
@@ -106,8 +115,10 @@ accuracies_raw = {
         2,
     )
     for i in [5, 4, 3, 2, 1]
-    for model in [f"nace2025_{x}" for x in df_dict.keys()]
-    + ["cascade_label", "voting_label", "weighted_voting_label"]
+    for model in [
+        f"nace2025_{x}"
+        for x in list(df_dict.keys()) + ["cascade_label", "voting_label", "weighted_voting_label"]
+    ]
 }
 
 accuracies_codable = {
@@ -133,8 +144,10 @@ accuracies_raw_llm = {
         2,
     )
     for i in [5, 4, 3, 2, 1]
-    for model in [f"nace2025_{x}" for x in df_dict.keys()]
-    + ["cascade_label", "voting_label", "weighted_voting_label"]
+    for model in [
+        f"nace2025_{x}"
+        for x in list(df_dict.keys()) + ["cascade_label", "voting_label", "weighted_voting_label"]
+    ]
 }
 
 stats = get_model_agreement_stats(eval_df, model_columns)
@@ -152,7 +165,11 @@ best_strategy = [
 ]
 
 final_df = merged_df.loc[
-    :, ["liasse_numero", f"{best_strategy[0].replace('accuracy_', '').replace('_lvl_5', '')}"]
+    :,
+    [
+        "liasse_numero",
+        f"nace2025_{best_strategy[0].replace('accuracy_', '').replace('_lvl_5', '')}",
+    ],
 ].rename(columns={f"{best_strategy[0].replace('accuracy_', '').replace('_lvl_5', '')}": "nace2025"})
 
 final_df.to_parquet(URL_SIRENE4_MULTIVOCAL_FINAL, filesystem=fs)
