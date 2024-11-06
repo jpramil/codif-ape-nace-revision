@@ -38,6 +38,10 @@ MODEL_TO_USE = {
         "weights": 1,
         "date_version": ["2024-11-02--08:01", "2024-11-03--13:45", "2024-11-03--15:46"],
     },
+    "hugging-quants--Meta-Llama-3.1-70B-Instruct-GPTQ-INT4": {
+        "weights": 1,
+        "date_version": ["2024-11-05--22:14", "2024-11-05--23:54"],
+    },
 }
 
 df_dict = {}
