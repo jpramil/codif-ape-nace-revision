@@ -8,8 +8,8 @@ from src.utils.data import get_file_system
 
 def cache_model_from_hf_hub(
     model_name,
-    s3_bucket="projet-ape",
-    s3_cache_dir="models/hf_hub",
+    s3_bucket="models-hf",
+    s3_cache_dir="hf_hub",
 ):
     """Use S3 as proxy cache from HF hub if a model is not already cached locally.
 
@@ -18,6 +18,10 @@ def cache_model_from_hf_hub(
         s3_bucket (str): Name of the S3 bucket to use.
         s3_cache_dir (str): Path of the cache directory on S3.
     """
+    assert (
+        "MC_host_s3" in os.environ
+    ), "Please set the MC_host_s3 environment variable."
+
     # Local cache config
     LOCAL_HF_CACHE_DIR = os.path.join(os.path.expanduser("~"), ".cache", "huggingface", "hub")
     model_name_hf_cache = "models--" + "--".join(model_name.split("/"))
@@ -40,6 +44,8 @@ def cache_model_from_hf_hub(
                 "-r",
                 f"s3/{dir_model_s3}",
                 f"{LOCAL_HF_CACHE_DIR}/",
+                "> dev/null",
+
             ]
             subprocess.run(cmd, check=True)
         # Else, fetch from HF Hub and push to S3
@@ -56,6 +62,7 @@ def cache_model_from_hf_hub(
                 "-r",
                 f"{dir_model_local}/",
                 f"s3/{dir_model_s3}",
+                "> dev/null",
             ]
             subprocess.run(cmd, check=True)
     else:
@@ -69,5 +76,6 @@ def cache_model_from_hf_hub(
                 "-r",
                 f"{dir_model_local}/",
                 f"s3/{dir_model_s3}",
+                "> dev/null",
             ]
             subprocess.run(cmd, check=True)
