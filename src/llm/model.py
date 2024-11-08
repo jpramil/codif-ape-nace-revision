@@ -43,11 +43,10 @@ def cache_model_from_hf_hub(
                 "cp",
                 "-r",
                 f"s3/{dir_model_s3}",
-                f"{LOCAL_HF_CACHE_DIR}/",
-                "> dev/null",
-
+                f"{LOCAL_HF_CACHE_DIR}/"
             ]
-            subprocess.run(cmd, check=True)
+            with open("/dev/null", "w") as devnull:
+                subprocess.run(cmd, check=True, stdout=devnull, stderr=devnull)
         # Else, fetch from HF Hub and push to S3
         else:
             print(f"Model {model_name} not found on S3, fetching from HF hub.")
@@ -61,10 +60,10 @@ def cache_model_from_hf_hub(
                 "cp",
                 "-r",
                 f"{dir_model_local}/",
-                f"s3/{dir_model_s3}",
-                "> dev/null",
+                f"s3/{dir_model_s3}",            
             ]
-            subprocess.run(cmd, check=True)
+            with open("/dev/null", "w") as devnull:
+                subprocess.run(cmd, check=True, stdout=devnull, stderr=devnull)
     else:
         print(f"Model {model_name} found in local cache. ")
         if model_name_hf_cache not in available_models_s3:
@@ -76,6 +75,6 @@ def cache_model_from_hf_hub(
                 "-r",
                 f"{dir_model_local}/",
                 f"s3/{dir_model_s3}",
-                "> dev/null",
             ]
-            subprocess.run(cmd, check=True)
+            with open("/dev/null", "w") as devnull:
+                subprocess.run(cmd, check=True, stdout=devnull, stderr=devnull)
