@@ -19,8 +19,8 @@ def cache_model_from_hf_hub(
         s3_cache_dir (str): Path of the cache directory on S3.
     """
     assert (
-        "MC_host_s3" in os.environ
-    ), "Please set the MC_host_s3 environment variable."
+        "MC_HOST_s3" in os.environ
+    ), "Please set the MC_HOST_s3 environment variable."
 
     # Local cache config
     LOCAL_HF_CACHE_DIR = os.path.join(os.path.expanduser("~"), ".cache", "huggingface", "hub")
