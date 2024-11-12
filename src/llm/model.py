@@ -10,6 +10,8 @@ def cache_model_from_hf_hub(
     model_name,
     s3_bucket="models-hf",
     s3_cache_dir="hf_hub",
+    s3_token=None,
+    hf_token=None
 ):
     """Use S3 as proxy cache from HF hub if a model is not already cached locally.
 
@@ -28,7 +30,7 @@ def cache_model_from_hf_hub(
     dir_model_local = os.path.join(LOCAL_HF_CACHE_DIR, model_name_hf_cache)
 
     # Remote cache config
-    fs = get_file_system()
+    fs = get_file_system(token=s3_token)
     available_models_s3 = [
         os.path.basename(path) for path in fs.ls(os.path.join(s3_bucket, s3_cache_dir))
     ]
@@ -53,6 +55,7 @@ def cache_model_from_hf_hub(
             AutoModelForCausalLM.from_pretrained(
                 model_name,
                 torch_dtype="auto",
+                token=hf_token
             )
             print(f"Putting model {model_name} on S3.")
             cmd = [
@@ -60,7 +63,7 @@ def cache_model_from_hf_hub(
                 "cp",
                 "-r",
                 f"{dir_model_local}/",
-                f"s3/{dir_model_s3}",            
+                f"s3/{dir_model_s3}",           
             ]
             with open("/dev/null", "w") as devnull:
                 subprocess.run(cmd, check=True, stdout=devnull, stderr=devnull)
