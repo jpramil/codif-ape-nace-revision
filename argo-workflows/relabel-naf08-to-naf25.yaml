@@ -14,16 +14,9 @@ spec:
     parameters:
       - name: params-conf-list
         value: '[
-            {"LLM_NAME": "Qwen/Qwen2.5-32B-Instruct"},
-            {"LLM_NAME": "Qwen/Qwen2.5-72B-Instruct-GPTQ-Int4"},
-
-            {"LLM_NAME": "mistralai/Ministral-8B-Instruct-2410"},
-            {"LLM_NAME": "mistralai/Mistral-7B-Instruct-v0.3"},
-            {"LLM_NAME": "mistralai/Mistral-Small-Instruct-2409"},
-
-            {"LLM_NAME": "neuralmagic/Llama-3.1-Nemotron-70B-Instruct-HF-FP8-dynamic"},
-            {"LLM_NAME": "meta-llama/Meta-Llama-3.1-8B-Instruct"},
-            {"LLM_NAME": "hugging-quants/Meta-Llama-3.1-70B-Instruct-GPTQ-INT4"}
+              {"LLM_NAME": "mistralai/Ministral-8B-Instruct-2410", "THIRD": 1},
+              {"LLM_NAME": "mistralai/Ministral-8B-Instruct-2410", "THIRD": 2},
+              {"LLM_NAME": "mistralai/Ministral-8B-Instruct-2410", "THIRD": 3}
             ]'
 
   templates:
@@ -35,15 +28,15 @@ spec:
             arguments:
               parameters:
                 - name: LLM_NAME
-                  value: "{{item.LLM_NAME}}"
-            # Pass the inputs to the task using "withParam"
-            withParam: "{{workflow.parameters.params-conf-list}}"
-
-    # Worker template
+                  value: '{{item.LLM_NAME}}'
+                - name: THIRD
+                  value: '{{item.THIRD}}'
+            withParam: '{{workflow.parameters.params-conf-list}}'
     - name: run-relabel
       inputs:
         parameters:
           - name: LLM_NAME
+          - name: THIRD
       nodeSelector:
         nvidia.com/gpu.product: "NVIDIA-H100-PCIe"
       container:
@@ -69,8 +62,7 @@ spec:
 
             export MC_HOST_s3=https://$AWS_ACCESS_KEY_ID:$AWS_SECRET_ACCESS_KEY@$AWS_S3_ENDPOINT
             huggingface-cli login --token $HF_TOKEN
-            python encode-multivoque.py --experiment_name NACE2025 --llm_name {{inputs.parameters.LLM_NAME}}
-
+            python encode-multivoque.py --experiment_name NACE2025 --llm_name {{inputs.parameters.LLM_NAME}} --third {{inputs.parameters.THIRD}}
         volumeMounts:
           - mountPath: /dev/shm
             name: dshm
