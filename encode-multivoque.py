@@ -27,11 +27,10 @@ from src.constants.paths import (
     URL_SIRENE4_MULTIVOCAL,
 )
 from src.constants.prompting import MODEL_TO_PROMPT_FORMAT
-from src.llm.model import cache_model_from_hf_hub
 from src.llm.prompting import apply_template, generate_prompt
 from src.llm.response import LLMResponse, process_response
 from src.mappings.mappings import get_mapping
-from src.utils.data import get_file_system
+from src.utils.cache_models import cache_model_from_hf_hub, get_file_system
 
 
 def encore_multivoque(

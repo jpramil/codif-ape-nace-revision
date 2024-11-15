@@ -9,7 +9,8 @@ from src.constants.paths import (
     URL_SIRENE4_MULTIVOCAL_FINAL,
 )
 from src.mappings.mappings import get_mapping
-from src.utils.data import get_file_system, merge_dataframes
+from src.utils.cache_models import get_file_system
+from src.utils.data import merge_dataframes
 from src.utils.strategies import (
     get_model_agreement_stats,
     select_labels_cascade,

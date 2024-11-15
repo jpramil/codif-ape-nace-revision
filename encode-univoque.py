@@ -10,7 +10,7 @@ from src.constants.paths import (
     URL_SIRENE4_UNIVOCAL,
 )
 from src.mappings.mappings import get_mapping
-from src.utils.data import get_file_system
+from src.utils.cache_models import get_file_system
 
 
 def encore_univoque():
