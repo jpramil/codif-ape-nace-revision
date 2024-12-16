@@ -27,21 +27,20 @@ fs = get_file_system()
 VAR_TO_KEEP = ["liasse_numero", "nace2025", "codable"]
 
 MODEL_TO_USE = {
+    # Best model on codable
+    "Qwen--Qwen2.5-32B-Instruct": {
+        "weights": 2,
+        "date_version": ["2024-11-13--00:39", "2024-11-15--01:13", "2024-11-13--01:45"],
+    },
+    # Second best model on codable
+    "mistralai--Mistral-Small-Instruct-2409": {
+        "weights": 2,
+        "date_version": ["2024-11-11--13:58", "2024-11-09--21:05", "2024-11-09--20:04"],
+    },
+    # Third best model on codable
     "mistralai--Ministral-8B-Instruct-2410": {
         "weights": 1,
-        "date_version": ["2024-11-01--00:55", "2024-11-01--00:57", "2024-11-01--00:50"],
-    },
-    "mistralai--Mistral-Small-Instruct-2409": {
-        "weights": 1,
-        "date_version": ["2024-11-02--02:50", "2024-11-02--03:47", "2024-11-02--04:16"],
-    },
-    "Qwen--Qwen2.5-32B-Instruct": {
-        "weights": 1,
-        "date_version": ["2024-11-02--08:01", "2024-11-03--13:45", "2024-11-03--15:46"],
-    },
-    "hugging-quants--Meta-Llama-3.1-70B-Instruct-GPTQ-INT4": {
-        "weights": 1,
-        "date_version": ["2024-11-05--22:14", "2024-11-05--23:54"],
+        "date_version": ["2024-11-15--20:37", "2024-11-15--21:17", "2024-11-15--20:49"],
     },
 }
 

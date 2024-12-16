@@ -62,7 +62,7 @@ spec:
 
             export MC_HOST_s3=https://$AWS_ACCESS_KEY_ID:$AWS_SECRET_ACCESS_KEY@$AWS_S3_ENDPOINT
             huggingface-cli login --token $HF_TOKEN
-            python encode-multivoque.py --experiment_name NACE2025 --llm_name {{inputs.parameters.LLM_NAME}} --third {{inputs.parameters.THIRD}}
+            python encode-multivoque.py --experiment_name NACE2025_DATASET --llm_name {{inputs.parameters.LLM_NAME}} --third {{inputs.parameters.THIRD}}
         volumeMounts:
           - mountPath: /dev/shm
             name: dshm
