@@ -161,7 +161,7 @@ def get_mapping(explanatory_notes: pd.DataFrame, mapping_table: pd.DataFrame) ->
                 NAF2025(
                     code=row.naf25_niv5,
                     label=row.lib_naf25_niv5,
-                    include=get_explanatory_notes(explanatory_notes, row.naf25_niv5, "notes"),
+                    include=get_explanatory_notes(explanatory_notes, row.naf25_niv5, "include"),
                     not_include=get_explanatory_notes(
                         explanatory_notes, row.naf25_niv5, "not_include"
                     ),
