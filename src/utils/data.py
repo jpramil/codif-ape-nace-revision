@@ -1,4 +1,55 @@
+import logging
+import os
+
 import pandas as pd
+import s3fs
+
+
+def get_file_system(token=None) -> s3fs.S3FileSystem:
+    """
+    Creates and returns an S3 file system instance using the s3fs library.
+
+    This function configures the S3 file system with endpoint URL and credentials
+    obtained from environment variables, enabling interactions with the specified
+    S3-compatible storage. Optionally, a security token can be provided for session-based
+    authentication.
+
+    Parameters:
+    -----------
+    token : str, optional
+        A temporary security token for session-based authentication. This is optional and
+        should be provided when using session-based credentials.
+
+    Returns:
+    --------
+    s3fs.S3FileSystem
+        An instance of the S3 file system configured with the specified endpoint and
+        credentials, ready to interact with S3-compatible storage.
+
+    Environment Variables:
+    ----------------------
+    AWS_S3_ENDPOINT : str
+        The S3 endpoint URL for the storage provider, typically in the format `https://{endpoint}`.
+    AWS_ACCESS_KEY_ID : str
+        The access key ID for authentication.
+    AWS_SECRET_ACCESS_KEY : str
+        The secret access key for authentication.
+
+    Example:
+    --------
+    fs = get_file_system(token="your_temporary_token")
+    """
+
+    options = {
+        "client_kwargs": {"endpoint_url": f"https://{os.environ['AWS_S3_ENDPOINT']}"},
+        "key": os.environ["AWS_ACCESS_KEY_ID"],
+        "secret": os.environ["AWS_SECRET_ACCESS_KEY"],
+    }
+
+    if token is not None:
+        options["token"] = token
+
+    return s3fs.S3FileSystem(**options)
 
 
 def merge_dataframes(df_dict: dict, merge_on, var_to_keep, columns_to_rename=None, how="inner"):
@@ -58,3 +109,13 @@ def merge_dataframes(df_dict: dict, merge_on, var_to_keep, columns_to_rename=Non
         )
 
     return result
+
+
+def load_excel_from_fs(fs, file_path):
+    """Load an Excel file from the file system."""
+    try:
+        with fs.open(file_path) as f:
+            return pd.read_excel(f, dtype=str)
+    except Exception as e:
+        logging.error(f"Failed to load file {file_path}: {e}")
+        raise

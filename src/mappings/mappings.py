@@ -172,3 +172,13 @@ def get_mapping(explanatory_notes: pd.DataFrame, mapping_table: pd.DataFrame) ->
         )
         for code08, subset in mapping_table.groupby("naf08_niv5")
     ]
+
+
+def get_nace2025_from_mapping(mapping):
+    """Generate unique NAF2025 codes from the mapping."""
+    unique_codes = {}
+    for code08 in mapping:
+        for code25 in code08.naf2025:
+            if code25.code not in unique_codes:
+                unique_codes[code25.code] = code25
+    return list(unique_codes.values())
