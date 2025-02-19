@@ -17,4 +17,4 @@ def create_content_vdb(df):
         return "\n\n".join(filter(None, sections))
 
     df["content"] = df.apply(generate_content, axis=1)
-    return df
+    return df.fillna("")

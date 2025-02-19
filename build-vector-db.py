@@ -5,6 +5,7 @@
 # [r.metadata["code"] for r in results]
 
 import logging
+import os
 import subprocess
 
 import pandas as pd
@@ -64,12 +65,18 @@ def main():
     logging.info("Chroma DB created and persisted locally.")
 
     # Copy the vector database to S3
+    hash_chroma = next(
+        entry
+        for entry in os.listdir(CHROMA_DB_LOCAL_DIRECTORY)
+        if os.path.isdir(os.path.join(CHROMA_DB_LOCAL_DIRECTORY, entry))
+    )
+    logging.info(f"Uploading Chroma DB ({hash_chroma}) to S3")
     cmd = [
         "mc",
         "cp",
         "-r",
         f"{CHROMA_DB_LOCAL_DIRECTORY}/",
-        f"s3/{CHROMA_DB_S3_DIRECTORY}/",
+        f"s3/{CHROMA_DB_S3_DIRECTORY}/{EMBEDDING_MODEL}/{hash_chroma}/",
     ]
     with open("/dev/null", "w") as devnull:
         subprocess.run(cmd, check=True, stdout=devnull, stderr=devnull)
