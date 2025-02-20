@@ -118,7 +118,7 @@ def encode_ambiguous(
 
     # Process data subset
     data = process_subset(data, third)
-    data = data.iloc[:1000]
+
     # Generate prompts
     prompts = [generate_prompt(row, mapping_ambiguous, parser) for row in data.itertuples()]
     batch_prompts = [p.prompt for p in prompts]
