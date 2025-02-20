@@ -17,7 +17,7 @@ from src.vector_db.parsing import create_content_vdb
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
-def main(collection_name: str):
+def main(collection_name: str, api_key: str):
     fs = get_file_system()
 
     # Load data
@@ -48,7 +48,9 @@ def main(collection_name: str):
         document_list,
         emb_model,
         url="https://projet-ape-377568-0.user.lab.sspcloud.fr",
-        api_key="7qo540r8gn35xljvdbkc",
+        api_key=api_key,
+        port="443",
+        https="true",
         prefer_grpc=True,
         collection_name=collection_name,
     )
@@ -57,4 +59,5 @@ def main(collection_name: str):
 
 
 if __name__ == "__main__":
-    main(collection_name="labels_embeddings")
+    api_key = "API_KEY"
+    main(collection_name="labels_embeddings", api_key=api_key)
