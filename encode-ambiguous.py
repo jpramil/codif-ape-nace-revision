@@ -3,7 +3,6 @@ import logging
 import os
 from datetime import datetime
 
-import duckdb
 import mlflow
 import pandas as pd
 import pyarrow as pa
@@ -29,14 +28,28 @@ from src.constants.paths import (
 )
 from src.llm.prompting import generate_prompt
 from src.llm.response import LLMResponse, process_response
-from src.mappings.mappings import get_mapping
-from src.utils.data import get_file_system, load_excel_from_fs
+from src.mappings.mappings import check_mapping, get_mapping
+from src.utils.data import get_file_system, load_data_from_s3, load_excel_from_fs, process_subset
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
+VAR_TO_KEEP = [
+    "liasse_numero",
+    "apet_finale",
+    "libelle",
+    "evenement_type",
+    "cj",
+    "activ_nat_et",
+    "liasse_type",
+    "activ_surf_et",
+    "activ_sec_agri_et",
+    "activ_nat_lib_et",
+    "activ_perm_et",
+]
 
-def encore_multivoque(
+
+def encode_ambiguous(
     experiment_name: str,
     run_name: str,
     llm_name: str = LLM_MODEL,
@@ -45,71 +58,43 @@ def encore_multivoque(
     parser = PydanticOutputParser(pydantic_object=LLMResponse)
     fs = get_file_system()
 
-    VAR_TO_KEEP = [
-        "liasse_numero",
-        "apet_finale",
-        "libelle",
-        "evenement_type",
-        "cj",
-        "activ_nat_et",
-        "liasse_type",
-        "activ_surf_et",
-        "activ_sec_agri_et",
-        "activ_nat_lib_et",
-        "activ_perm_et",
-    ]
-
     # Load excel files containing informations about mapping
     table_corres = load_excel_from_fs(fs, URL_MAPPING_TABLE)
     notes_ex = load_excel_from_fs(fs, URL_EXPLANATORY_NOTES)
-
     mapping = get_mapping(notes_ex, table_corres)
     mapping_ambiguous = [code for code in mapping if len(code.naf2025) > 1]
 
-    con = duckdb.connect(database=":memory:")
-    data = (
-        con.query(
-            f"""
-        SET s3_endpoint='{os.getenv("AWS_S3_ENDPOINT")}';
-        SET s3_access_key_id='{os.getenv("AWS_ACCESS_KEY_ID")}';
-        SET s3_secret_access_key='{os.getenv("AWS_SECRET_ACCESS_KEY")}';
-        SET s3_session_token='';
-
-        SELECT
-            *
-        FROM
-            read_parquet('{URL_SIRENE4_EXTRACTION}')
-        WHERE
-            apet_finale IN ('{"', '".join([m.code for m in mapping_ambiguous])}')
-    ;
+    # Load main data
+    ambiguous_codes = "', '".join([m.code for m in mapping_ambiguous])
+    query = f"""
+        SELECT * FROM read_parquet('{URL_SIRENE4_EXTRACTION}')
+        WHERE apet_finale IN ('{ambiguous_codes}')
     """
-        )
-        .to_df()
-        .loc[:, VAR_TO_KEEP]
-    )
-
-    # We keep only unique ids
-    data = data.drop_duplicates(subset="liasse_numero")
+    data = load_data_from_s3(query).loc[:, VAR_TO_KEEP].drop_duplicates(subset="liasse_numero")
 
     # We keep only non duplicated description and complementary variables
-    data = data.drop_duplicates(
-        subset=[v for v in VAR_TO_KEEP if v != "liasse_numero" and v != "apet_finale"]
+    data = (
+        data.drop_duplicates(
+            subset=[v for v in VAR_TO_KEEP if v != "liasse_numero" and v != "apet_finale"]
+        )
+        .sort_values("liasse_numero")
+        .reset_index(drop=True)
     )
-    data.reset_index(drop=True, inplace=True)
-    con.close()
 
+    # Load Ground Truth data
+    query = f"""SELECT * FROM read_parquet('{URL_GROUND_TRUTH}')"""
     ground_truth = (
-        pq.ParquetDataset(URL_GROUND_TRUTH.replace("s3://", ""), filesystem=fs).read().to_pandas()
+        load_data_from_s3(query)
+        .loc[:, ["liasse_numero", "apet_manual", "NAF2008_code"]]
+        .drop_duplicates(subset="liasse_numero")
+        .sort_values("liasse_numero")
+        .reset_index(drop=True)
     )
-    ground_truth = ground_truth.drop_duplicates(subset="liasse_numero")
 
     # Check if the mapping is correct
-    def check_mapping(naf08, naf25):
-        return naf25 in naf08_to_naf2025.get(naf08, set())
-
     naf08_to_naf2025 = {m.code: [c.code for c in m.naf2025] for m in mapping}
     ground_truth["mapping_ok"] = [
-        check_mapping(naf08, naf25)
+        check_mapping(naf08, naf25, naf08_to_naf2025)
         for naf08, naf25 in zip(ground_truth["NAF2008_code"], ground_truth["apet_manual"])
     ]
 
@@ -120,6 +105,7 @@ def encore_multivoque(
     # ].sample(300000 - data_ground_truth.shape[0], random_state=2025)
     # data = pd.concat([data_ground_truth, data_not_ground_truth], axis=0)
 
+    # Initialize LLM
     sampling_params = SamplingParams(
         max_tokens=MAX_NEW_TOKEN,
         temperature=TEMPERATURE,
@@ -127,48 +113,28 @@ def encore_multivoque(
         repetition_penalty=REP_PENALTY,
         seed=2025,
     )
-
     local_path_model = os.path.expanduser(f"~/.cache/huggingface/hub/{llm_name}")
     llm = LLM(model=local_path_model, **MODEL_TO_ARGS.get(llm_name, {}))
-    # Sort data by liasse_numero to ensure reproducibility
-    data = data.sort_values("liasse_numero").reset_index(drop=True)
 
-    # If third is specified, process only a subset of the data for that third
-    if third is not None:
-        idx_for_subset = [
-            ((data.shape[0] // 3) * (third - 1)),  # Start index for the subset
-            ((data.shape[0] // 3) * third),  # End index for the subset
-        ]
-        idx_for_subset[-1] = (
-            idx_for_subset[-1] if third != 3 else data.shape[0]
-        )  # Adjust for the last third
-        data = data.iloc[idx_for_subset[0] : idx_for_subset[1]]  # Select subset
-
+    # Process data subset
+    data = process_subset(data, third)
+    data = data.iloc[:1000]
+    # Generate prompts
     prompts = [generate_prompt(row, mapping_ambiguous, parser) for row in data.itertuples()]
-
     batch_prompts = [p.prompt for p in prompts]
 
     mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI"))
     mlflow.set_experiment(experiment_name)
-
     with mlflow.start_run(run_name=run_name):
         outputs = llm.chat(batch_prompts, sampling_params=sampling_params)
-        responses = [outputs[i].outputs[0].text for i in range(len(outputs))]
+        responses = [output.outputs[0].text for output in outputs]
 
         results = [
             process_response(response=response, prompt=prompt, parser=parser)
             for response, prompt in zip(responses, prompts)
         ]
 
-        results_df = data.merge(pd.DataFrame(results), on="liasse_numero").loc[
-            :,
-            VAR_TO_KEEP
-            + [
-                "nace2025",
-                "nace08_valid",
-                "codable",
-            ],
-        ]
+        results_df = data.merge(pd.DataFrame(results), on="liasse_numero")
 
         # Fill missing values with undefined for nace08 for parquet partition compatibility
         results_df["nace08_valid"] = results_df["nace08_valid"].fillna("undefined").astype(str)
@@ -183,13 +149,6 @@ def encore_multivoque(
             filesystem=fs,
         )
 
-        mlflow.log_param("num_coded", results_df["codable"].sum())
-        mlflow.log_param("num_not_coded", len(results_df) - results_df["codable"].sum())
-        mlflow.log_param(
-            "pct_not_coded",
-            round((len(results_df) - results_df["codable"].sum()) / len(results_df) * 100, 2),
-        )
-
         # EVALUATION
         ground_truth = ground_truth.loc[:, ["liasse_numero", "apet_manual", "mapping_ok"]]
 
@@ -198,7 +157,6 @@ def encore_multivoque(
             on="liasse_numero",
             how="inner",
         )
-        mlflow.log_param("eval_size", eval_df.shape[0])
 
         accuracies_overall = {
             f"accuracy_overall_lvl_{i}": round(
@@ -208,8 +166,6 @@ def encore_multivoque(
             for i in [5, 4, 3, 2, 1]
         }
 
-        # Accuracies when mapping is correct (true code is in the proposed list for the llm)
-        mlflow.log_param("mapping_ok", eval_df["mapping_ok"].sum())
         accuracies_llm = {
             f"accuracy_llm_lvl_{i}": round(
                 (
@@ -233,18 +189,28 @@ def encore_multivoque(
             )
             for i in [5, 4, 3, 2, 1]
         }
+
+        # Log MLflow parameters and metrics
+        mlflow.log_params(
+            {
+                "LLM_MODEL": llm_name,
+                "TEMPERATURE": TEMPERATURE,
+                "TOP_P": TOP_P,
+                "REP_PENALTY": REP_PENALTY,
+                "input_path": URL_SIRENE4_EXTRACTION,
+                "output_path": f"{URL_SIRENE4_AMBIGUOUS}/{"--".join(llm_name.split("/"))}/part-{third if third else 0}--{date}.parquet",
+                "num_coded": results_df["codable"].sum(),
+                "num_not_coded": len(results_df) - results_df["codable"].sum(),
+                "pct_not_coded": round(
+                    (len(results_df) - results_df["codable"].sum()) / len(results_df) * 100, 2
+                ),
+                "eval_size": eval_df.shape[0],
+                "mapping_ok": eval_df["mapping_ok"].sum(),
+            }
+        )
+
         for metric, value in (accuracies_overall | accuracies_llm | accuracies_codable).items():
             mlflow.log_metric(metric, value)
-
-        mlflow.log_param("LLM_MODEL", llm_name)
-        mlflow.log_param("TEMPERATURE", TEMPERATURE)
-        mlflow.log_param("TOP_P", TOP_P)
-        mlflow.log_param("REP_PENALTY", REP_PENALTY)
-        mlflow.log_param("input_path", URL_SIRENE4_EXTRACTION)
-        mlflow.log_param(
-            "output_path",
-            f"{URL_SIRENE4_AMBIGUOUS}/{"--".join(llm_name.split("/"))}/part-{third if third else 0}--{date}.parquet",
-        )
 
 
 if __name__ == "__main__":
@@ -273,8 +239,6 @@ if __name__ == "__main__":
         help="LLM model name",
         choices=MODEL_TO_ARGS.keys(),
     )
-
-    # Optional argument for specifying the third of the dataset to process
     parser.add_argument(
         "--third",
         type=int,
@@ -283,5 +247,4 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-
-    encore_multivoque(**vars(args))
+    encode_ambiguous(**vars(args))

@@ -1,6 +1,8 @@
 import logging
 import os
+from typing import Optional
 
+import duckdb
 import pandas as pd
 import s3fs
 
@@ -119,3 +121,31 @@ def load_excel_from_fs(fs, file_path):
     except Exception as e:
         logging.error(f"Failed to load file {file_path}: {e}")
         raise
+
+
+def load_data_from_s3(query: str) -> pd.DataFrame:
+    """Load data from S3 using DuckDB."""
+    with duckdb.connect(database=":memory:") as con:
+        try:
+            con.execute(f"""
+                SET s3_endpoint='{os.getenv("AWS_S3_ENDPOINT")}';
+                SET s3_access_key_id='{os.getenv("AWS_ACCESS_KEY_ID")}';
+                SET s3_secret_access_key='{os.getenv("AWS_SECRET_ACCESS_KEY")}';
+                SET s3_session_token='';
+            """)
+            result_df = con.execute(query).fetch_df()
+            return result_df
+        except Exception as e:
+            logging.error(f"Failed to load data from S3: {e}")
+            raise
+
+
+def process_subset(data: pd.DataFrame, third: Optional[int]) -> pd.DataFrame:
+    """Process only a subset of the data based on the 'third' argument."""
+    if third is None:
+        return data
+
+    subset_size = len(data) // 3
+    start_idx = subset_size * (third - 1)
+    end_idx = subset_size * third if third != 3 else len(data)
+    return data.iloc[start_idx:end_idx]

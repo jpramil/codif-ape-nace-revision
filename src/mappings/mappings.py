@@ -1,4 +1,5 @@
 import unicodedata
+from typing import Dict, List
 
 import pandas as pd
 
@@ -182,3 +183,8 @@ def get_nace2025_from_mapping(mapping):
             if code25.code not in unique_codes:
                 unique_codes[code25.code] = code25
     return list(unique_codes.values())
+
+
+def check_mapping(naf08: str, naf25: str, naf08_to_naf2025: Dict[str, List[str]]) -> bool:
+    """Check if mapping is correct."""
+    return naf25 in naf08_to_naf2025.get(naf08, [])
