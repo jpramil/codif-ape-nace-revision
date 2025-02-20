@@ -1,9 +1,9 @@
 URL_SIRENE4_EXTRACTION = "s3://projet-ape/extractions/20241027_sirene4.parquet"
-URL_SIRENE4_MULTIVOCAL = "s3://projet-ape/NAF-revision/relabeled-data"
+URL_SIRENE4_AMBIGUOUS = "s3://projet-ape/NAF-revision/relabeled-data"
 URL_SIRENE4_UNIVOCAL = (
     "s3://projet-ape/NAF-revision/relabeled-data/20241027_sirene4_univoques.parquet"
 )
-URL_SIRENE4_MULTIVOCAL_FINAL = (
+URL_SIRENE4_AMBIGUOUS_FINAL = (
     "s3://projet-ape/NAF-revision/relabeled-data/20241027_sirene4_multivoques.parquet"
 )
 URL_SIRENE4_NACE2025 = (

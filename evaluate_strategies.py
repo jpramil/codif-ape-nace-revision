@@ -5,8 +5,8 @@ from src.constants.paths import (
     URL_EXPLANATORY_NOTES,
     URL_GROUND_TRUTH,
     URL_MAPPING_TABLE,
-    URL_SIRENE4_MULTIVOCAL,
-    URL_SIRENE4_MULTIVOCAL_FINAL,
+    URL_SIRENE4_AMBIGUOUS,
+    URL_SIRENE4_AMBIGUOUS_FINAL,
 )
 from src.mappings.mappings import get_mapping
 from src.utils.cache_models import get_file_system
@@ -47,7 +47,7 @@ MODEL_TO_USE = {
 df_dict = {}
 for llm_name in MODEL_TO_USE.keys():
     dataset = pq.ParquetDataset(
-        f"{URL_SIRENE4_MULTIVOCAL.replace('s3://', '')}/{llm_name}",
+        f"{URL_SIRENE4_AMBIGUOUS.replace('s3://', '')}/{llm_name}",
         filesystem=fs,
     )
     df_dict[llm_name] = (
@@ -180,4 +180,4 @@ final_df = merged_df.loc[
     }
 )
 
-final_df.to_parquet(URL_SIRENE4_MULTIVOCAL_FINAL, filesystem=fs)
+final_df.to_parquet(URL_SIRENE4_AMBIGUOUS_FINAL, filesystem=fs)

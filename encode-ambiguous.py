@@ -23,14 +23,14 @@ from src.constants.paths import (
     URL_EXPLANATORY_NOTES,
     URL_GROUND_TRUTH,
     URL_MAPPING_TABLE,
+    URL_SIRENE4_AMBIGUOUS,
     URL_SIRENE4_EXTRACTION,
-    URL_SIRENE4_MULTIVOCAL,
 )
 from src.constants.prompting import MODEL_TO_PROMPT_FORMAT
 from src.llm.prompting import apply_template, generate_prompt
 from src.llm.response import LLMResponse, process_response
 from src.mappings.mappings import get_mapping
-from src.utils.cache_models import cache_model_from_hf_hub, get_file_system
+from src.utils.data import get_file_system, load_excel_from_fs
 
 
 def encore_multivoque(
@@ -57,14 +57,11 @@ def encore_multivoque(
     ]
 
     # Load excel files containing informations about mapping
-    with fs.open(URL_MAPPING_TABLE) as f:
-        table_corres = pd.read_excel(f, dtype=str)
-
-    with fs.open(URL_EXPLANATORY_NOTES) as f:
-        notes_ex = pd.read_excel(f, dtype=str)
+    table_corres = load_excel_from_fs(fs, URL_MAPPING_TABLE)
+    notes_ex = load_excel_from_fs(fs, URL_EXPLANATORY_NOTES)
 
     mapping = get_mapping(notes_ex, table_corres)
-    mapping_multivocal = [code for code in mapping if len(code.naf2025) > 1]
+    mapping_ambiguous = [code for code in mapping if len(code.naf2025) > 1]
 
     con = duckdb.connect(database=":memory:")
     data = (
@@ -80,7 +77,7 @@ def encore_multivoque(
         FROM
             read_parquet('{URL_SIRENE4_EXTRACTION}')
         WHERE
-            apet_finale IN ('{"', '".join([m.code for m in mapping_multivocal])}')
+            apet_finale IN ('{"', '".join([m.code for m in mapping_ambiguous])}')
     ;
     """
         )
@@ -120,9 +117,9 @@ def encore_multivoque(
     # ].sample(300000 - data_ground_truth.shape[0], random_state=2025)
     # data = pd.concat([data_ground_truth, data_not_ground_truth], axis=0)
 
-    cache_model_from_hf_hub(
-        llm_name,
-    )
+    # cache_model_from_hf_hub(
+    #     llm_name,
+    # )
 
     sampling_params = SamplingParams(
         max_tokens=MAX_NEW_TOKEN,
@@ -148,7 +145,7 @@ def encore_multivoque(
         )  # Adjust for the last third
         data = data.iloc[idx_for_subset[0] : idx_for_subset[1]]  # Select subset
 
-    prompts = [generate_prompt(row, mapping_multivocal, parser) for row in data.itertuples()]
+    prompts = [generate_prompt(row, mapping_ambiguous, parser) for row in data.itertuples()]
 
     batch_prompts = apply_template([p.prompt for p in prompts], MODEL_TO_PROMPT_FORMAT[llm_name])
 
@@ -180,7 +177,7 @@ def encore_multivoque(
         date = datetime.now().strftime("%Y-%m-%d--%H:%M")
         pq.write_to_dataset(
             pa.Table.from_pandas(results_df),
-            root_path=f"{URL_SIRENE4_MULTIVOCAL}/{"--".join(llm_name.split("/"))}",
+            root_path=f"{URL_SIRENE4_AMBIGUOUS}/{"--".join(llm_name.split("/"))}",
             partition_cols=["nace08_valid", "codable"],
             basename_template=f"part-{{i}}{f'-{third}' if third else ""}{f'--{date}'}.parquet",  # Filename template for Parquet parts
             existing_data_behavior="overwrite_or_ignore",
@@ -247,7 +244,7 @@ def encore_multivoque(
         mlflow.log_param("input_path", URL_SIRENE4_EXTRACTION)
         mlflow.log_param(
             "output_path",
-            f"{URL_SIRENE4_MULTIVOCAL}/{"--".join(llm_name.split("/"))}/part-{third if third else 0}--{date}.parquet",
+            f"{URL_SIRENE4_AMBIGUOUS}/{"--".join(llm_name.split("/"))}/part-{third if third else 0}--{date}.parquet",
         )
 
 
