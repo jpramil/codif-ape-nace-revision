@@ -27,8 +27,7 @@ from src.constants.paths import (
     URL_SIRENE4_AMBIGUOUS,
     URL_SIRENE4_EXTRACTION,
 )
-from src.constants.prompting import MODEL_TO_PROMPT_FORMAT
-from src.llm.prompting import apply_template, generate_prompt
+from src.llm.prompting import generate_prompt
 from src.llm.response import LLMResponse, process_response
 from src.mappings.mappings import get_mapping
 from src.utils.data import get_file_system, load_excel_from_fs
@@ -121,10 +120,6 @@ def encore_multivoque(
     # ].sample(300000 - data_ground_truth.shape[0], random_state=2025)
     # data = pd.concat([data_ground_truth, data_not_ground_truth], axis=0)
 
-    # cache_model_from_hf_hub(
-    #     llm_name,
-    # )
-
     sampling_params = SamplingParams(
         max_tokens=MAX_NEW_TOKEN,
         temperature=TEMPERATURE,
@@ -135,7 +130,6 @@ def encore_multivoque(
 
     local_path_model = os.path.expanduser(f"~/.cache/huggingface/hub/{llm_name}")
     llm = LLM(model=local_path_model, **MODEL_TO_ARGS.get(llm_name, {}))
-
     # Sort data by liasse_numero to ensure reproducibility
     data = data.sort_values("liasse_numero").reset_index(drop=True)
 
@@ -152,13 +146,13 @@ def encore_multivoque(
 
     prompts = [generate_prompt(row, mapping_ambiguous, parser) for row in data.itertuples()]
 
-    batch_prompts = apply_template([p.prompt for p in prompts], MODEL_TO_PROMPT_FORMAT[llm_name])
+    batch_prompts = [p.prompt for p in prompts]
 
     mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI"))
     mlflow.set_experiment(experiment_name)
 
     with mlflow.start_run(run_name=run_name):
-        outputs = llm.generate(batch_prompts, sampling_params=sampling_params)
+        outputs = llm.chat(batch_prompts, sampling_params=sampling_params)
         responses = [outputs[i].outputs[0].text for i in range(len(outputs))]
 
         results = [
