@@ -12,4 +12,4 @@ compressed_tensors>=0.7.0
 optimum>=1.23.1
 langchain_community>=0.3.1
 langchain_huggingface
-chromadb
+langchain_qdrant

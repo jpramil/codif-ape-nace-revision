@@ -1,23 +1,12 @@
-# SEARCH_ALGO="similarity"
-# MAX_CODE_RETRIEVED=5
-# retriever = db.as_retriever(search_type=SEARCH_ALGO, search_kwargs={"k": 10})
-# results = retriever.invoke(input_txt.format(task_description=task_description, query=activity))
-# [r.metadata["code"] for r in results]
-
 import logging
-import os
-import subprocess
 
 import pandas as pd
-from chromadb.config import Settings
 from langchain_community.document_loaders import DataFrameLoader
-from langchain_community.vectorstores import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_qdrant import QdrantVectorStore
 
 from src.constants.paths import URL_EXPLANATORY_NOTES, URL_MAPPING_TABLE
 from src.constants.vector_db import (
-    CHROMA_DB_LOCAL_DIRECTORY,
-    CHROMA_DB_S3_DIRECTORY,
     EMBEDDING_MODEL,
 )
 from src.mappings.mappings import get_mapping, get_nace2025_from_mapping
@@ -28,7 +17,7 @@ from src.vector_db.parsing import create_content_vdb
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
-def main():
+def main(collection_name: str):
     fs = get_file_system()
 
     # Load data
@@ -54,33 +43,18 @@ def main():
         show_progress=False,
     )
 
-    # Create and persist Chroma DB
-    Chroma.from_documents(
-        collection_name="labels_embeddings",
-        documents=document_list,
-        persist_directory=CHROMA_DB_LOCAL_DIRECTORY,
-        embedding=emb_model,
-        client_settings=Settings(anonymized_telemetry=False, is_persistent=True),
+    # Create Qdrant DB
+    QdrantVectorStore.from_documents(
+        document_list,
+        emb_model,
+        url="https://projet-ape-377568-0.user.lab.sspcloud.fr",
+        api_key="7qo540r8gn35xljvdbkc",
+        prefer_grpc=True,
+        collection_name=collection_name,
     )
-    logging.info("Chroma DB created and persisted locally.")
 
-    # Copy the vector database to S3
-    hash_chroma = next(
-        entry
-        for entry in os.listdir(CHROMA_DB_LOCAL_DIRECTORY)
-        if os.path.isdir(os.path.join(CHROMA_DB_LOCAL_DIRECTORY, entry))
-    )
-    logging.info(f"Uploading Chroma DB ({hash_chroma}) to S3")
-    cmd = [
-        "mc",
-        "cp",
-        "-r",
-        f"{CHROMA_DB_LOCAL_DIRECTORY}/",
-        f"s3/{CHROMA_DB_S3_DIRECTORY}/{EMBEDDING_MODEL}/{hash_chroma}/",
-    ]
-    with open("/dev/null", "w") as devnull:
-        subprocess.run(cmd, check=True, stdout=devnull, stderr=devnull)
+    logging.info("Qdrant DB has been created in collection '{collection_name}'.")
 
 
 if __name__ == "__main__":
-    main()
+    main(collection_name="labels_embeddings")
