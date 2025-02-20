@@ -8,6 +8,7 @@
   - [🚀 Getting Started](#-getting-started)
     - [🛠 Installation](#-installation)
     - [🏗 Pre-commit Setup](#-pre-commit-setup)
+    - [Cache LLM model from S3 Bucket (Optionnal)](#cache-llm-model-from-s3-bucket-optionnal)
   - [📜 Running the Scripts](#-running-the-scripts)
     - [✅ 1. Build Vector Database (if you are in the RAG case)](#-1-build-vector-database-if-you-are-in-the-rag-case)
     - [🏷 2. Encode Business Activity Codes](#-2-encode-business-activity-codes)
@@ -18,62 +19,71 @@
   - [📄 License](#-license)
 
 
-## 📖 Overview  
+## 📖 Overview
 This repository is dedicated to the revision of the **Nomenclature statistique des Activités économiques dans la Communauté Européenne (NACE)**.
 
 It provides tools for **automated classification and evaluation of business activity codes** using **Large Language Models (LLMs)** and vector-based retrieval systems.
 
 
-## 🚀 Getting Started  
+## 🚀 Getting Started
 
-### 🛠 Installation  
-Ensure you have **Python 3.12+** installed, then install the required dependencies:  
+### 🛠 Installation
+Ensure you have **Python 3.12+** installed, then install the required dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 🏗 Pre-commit Setup  
-Set up linting and formatting checks using `pre-commit`:  
+### 🏗 Pre-commit Setup
+Set up linting and formatting checks using `pre-commit`:
 
 ```bash
 pre-commit install
 ```
 
+### Cache LLM model from S3 Bucket (Optionnal)
+If you want to use a model available in the SSPCloud you can execute this command:
 
-## 📜 Running the Scripts  
+```bash
+MODEL_NAME=mistralai/Ministral-8B-Instruct-2410
+LOCAL_PATH=~/.cache/huggingface/hub
 
-### ✅ 1. Build Vector Database (if you are in the RAG case)  
+./bash/fetch_model_s3.sh $MODEL_NAME $LOCAL_PATH
+```
 
-To create a searchable database of NACE 2025 codes:  
+## 📜 Running the Scripts
+
+### ✅ 1. Build Vector Database (if you are in the RAG case)
+
+To create a searchable database of NACE 2025 codes:
 
 ```bash
 python build-vector-db.py
 ```
 
-### 🏷 2. Encode Business Activity Codes  
+### 🏷 2. Encode Business Activity Codes
 
-For **unambiguous** classification:  
+For **unambiguous** classification:
 
 ```bash
 python encode-univoque.py
 ```
 
-For **ambiguous** classification using an LLM:  
+For **ambiguous** classification using an LLM:
 
 ```bash
 python encode-multivoque.py --experiment_name NACE2025_DATASET --llm_name mistralai/Mistral-7B-Instruct
 ```
 
-### 🔬 3. Evaluate Classification Strategies  
+### 🔬 3. Evaluate Classification Strategies
 
-Compare different classification models:  
+Compare different classification models:
 
 ```bash
 python evaluate_strategies.py
 ```
 
-### 📊 4. Build the NACE 2025 Dataset  
+### 📊 4. Build the NACE 2025 Dataset
 
 Once all unique ambiguous cases have been recoded using the best strategy, you can rebuild the entire dataset with NACE 2025 labels:
 
@@ -83,19 +93,19 @@ python build_nace2025_sirene4.py
 
 ---
 
-## 📡 LLM Integration  
-This repository leverages **Large Language Models (LLMs)** to assist in classifying business activities. The supported models include:  
+## 📡 LLM Integration
+This repository leverages **Large Language Models (LLMs)** to assist in classifying business activities. The supported models include:
 
-- `Qwen/Qwen2.5-32B-Instruct`  
-- `mistralai/Mistral-Small-Instruct-2409`  
-- `hugging-quants/Meta-Llama-3.1-70B-Instruct-GPTQ-INT4`  
+- `Qwen/Qwen2.5-32B-Instruct`
+- `mistralai/Mistral-Small-Instruct-2409`
+- `hugging-quants/Meta-Llama-3.1-70B-Instruct-GPTQ-INT4`
 
 These models help improve classification accuracy for ambiguous business activity cases.
 
 
-## 🏗 Argo Workflows  
-This project supports **automated workflows** via [Argo Workflows](https://argoproj.github.io/argo-workflows/).  
-To trigger a workflow, execute:  
+## 🏗 Argo Workflows
+This project supports **automated workflows** via [Argo Workflows](https://argoproj.github.io/argo-workflows/).
+To trigger a workflow, execute:
 
 ```yaml
 argo submit argo-workflows/relabel-naf08-to-naf25.yaml
@@ -104,6 +114,5 @@ argo submit argo-workflows/relabel-naf08-to-naf25.yaml
 Or use the **Argo Workflow UI**.
 
 
-## 📄 License  
+## 📄 License
 This project is licensed under the **Apache License 2.0**. See the [LICENSE](LICENSE) file for details.
-
