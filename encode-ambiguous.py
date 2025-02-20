@@ -1,4 +1,5 @@
 import argparse
+import logging
 import os
 from datetime import datetime
 
@@ -31,6 +32,9 @@ from src.llm.prompting import apply_template, generate_prompt
 from src.llm.response import LLMResponse, process_response
 from src.mappings.mappings import get_mapping
 from src.utils.data import get_file_system, load_excel_from_fs
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
 def encore_multivoque(
@@ -129,7 +133,8 @@ def encore_multivoque(
         seed=2025,
     )
 
-    llm = LLM(model=llm_name, **MODEL_TO_ARGS.get(llm_name, {}))
+    local_path_model = os.path.expanduser(f"~/.cache/huggingface/hub/{llm_name}")
+    llm = LLM(model=local_path_model, **MODEL_TO_ARGS.get(llm_name, {}))
 
     # Sort data by liasse_numero to ensure reproducibility
     data = data.sort_values("liasse_numero").reset_index(drop=True)
