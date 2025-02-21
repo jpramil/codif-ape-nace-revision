@@ -47,12 +47,12 @@ def main(collection_name: str, api_key: str):
     QdrantVectorStore.from_documents(
         document_list,
         emb_model,
-        url="https://projet-ape-377568-0.user.lab.sspcloud.fr",
+        collection_name=collection_name,
+        vector_name=EMBEDDING_MODEL,
+        url="projet-ape-qdrant.user.lab.sspcloud.fr",
         api_key=api_key,
         port="443",
-        https="true",
-        prefer_grpc=True,
-        collection_name=collection_name,
+        https=True,
     )
 
     logging.info("Qdrant DB has been created in collection '{collection_name}'.")
