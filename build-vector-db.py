@@ -1,4 +1,5 @@
 import logging
+import os
 
 import pandas as pd
 from langchain_community.document_loaders import DataFrameLoader
@@ -17,7 +18,7 @@ from src.vector_db.parsing import create_content_vdb
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
-def main(collection_name: str, api_key: str):
+def main(collection_name: str):
     fs = get_file_system()
 
     # Load data
@@ -50,7 +51,7 @@ def main(collection_name: str, api_key: str):
         collection_name=collection_name,
         vector_name=EMBEDDING_MODEL,
         url="projet-ape-qdrant.user.lab.sspcloud.fr",
-        api_key=api_key,
+        api_key=os.getenv("QDRANT_API_KEY"),
         port="443",
         https=True,
     )
@@ -59,5 +60,4 @@ def main(collection_name: str, api_key: str):
 
 
 if __name__ == "__main__":
-    api_key = "API_KEY"
-    main(collection_name="labels_embeddings", api_key=api_key)
+    main(collection_name="labels_embeddings", api_key=os.getenv("QDRANT_API_KEY"))
