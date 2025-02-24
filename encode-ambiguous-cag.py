@@ -91,12 +91,12 @@ def encode_ambiguous(
         .reset_index(drop=True)
     )
 
-    # Check if the mapping is correct
-    naf08_to_naf2025 = {m.code: [c.code for c in m.naf2025] for m in mapping}
-    ground_truth["mapping_ok"] = [
-        check_mapping(naf08, naf25, naf08_to_naf2025)
-        for naf08, naf25 in zip(ground_truth["NAF2008_code"], ground_truth["apet_manual"])
-    ]
+    # Process data subset
+    data = process_subset(data, third)
+
+    # Generate prompts
+    prompts = [generate_prompt(row, mapping_ambiguous, parser) for row in data.itertuples()]
+    batch_prompts = [p.prompt for p in prompts]
 
     # # TODO: Temp to only run data that has been manually coded + some random data
     # data_ground_truth = data.loc[data["liasse_numero"].isin(ground_truth["liasse_numero"].tolist())]
@@ -115,13 +115,6 @@ def encode_ambiguous(
     )
     local_path_model = os.path.expanduser(f"~/.cache/huggingface/hub/{llm_name}")
     llm = LLM(model=local_path_model, **MODEL_TO_ARGS.get(llm_name, {}))
-
-    # Process data subset
-    data = process_subset(data, third)
-
-    # Generate prompts
-    prompts = [generate_prompt(row, mapping_ambiguous, parser) for row in data.itertuples()]
-    batch_prompts = [p.prompt for p in prompts]
 
     mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI"))
     mlflow.set_experiment(experiment_name)
@@ -150,6 +143,12 @@ def encode_ambiguous(
         )
 
         # EVALUATION
+        # Check if the mapping is correct
+        naf08_to_naf2025 = {m.code: [c.code for c in m.naf2025] for m in mapping}
+        ground_truth["mapping_ok"] = [
+            check_mapping(naf08, naf25, naf08_to_naf2025)
+            for naf08, naf25 in zip(ground_truth["NAF2008_code"], ground_truth["apet_manual"])
+        ]
         ground_truth = ground_truth.loc[:, ["liasse_numero", "apet_manual", "mapping_ok"]]
 
         eval_df = ground_truth.merge(
