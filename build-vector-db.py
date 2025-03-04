@@ -8,6 +8,7 @@ from langchain_qdrant import QdrantVectorStore
 
 from src.constants.paths import URL_EXPLANATORY_NOTES, URL_MAPPING_TABLE
 from src.constants.vector_db import (
+    COLLECTION_NAME,
     EMBEDDING_MODEL,
 )
 from src.mappings.mappings import get_mapping, get_nace2025_from_mapping
@@ -60,4 +61,4 @@ def main(collection_name: str):
 
 
 if __name__ == "__main__":
-    main(collection_name="labels_embeddings", api_key=os.getenv("QDRANT_API_KEY"))
+    main(collection_name=COLLECTION_NAME, api_key=os.getenv("QDRANT_API_KEY"))
