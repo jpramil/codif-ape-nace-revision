@@ -20,17 +20,13 @@ from src.constants.llm import (
     TOP_P,
 )
 from src.constants.paths import (
-    URL_EXPLANATORY_NOTES,
-    URL_GROUND_TRUTH,
-    URL_MAPPING_TABLE,
-    URL_SIRENE4_AMBIGUOUS,
+    URL_SIRENE4_AMBIGUOUS_RAG,
     URL_SIRENE4_EXTRACTION,
 )
 from src.constants.vector_db import COLLECTION_NAME
 from src.llm.prompting import generate_prompt_rag
 from src.llm.response import RAGResponse, process_response
-from src.mappings.mappings import check_mapping, get_mapping
-from src.utils.data import get_file_system, load_data_from_s3, load_excel_from_fs, process_subset
+from src.utils.data import get_data, get_file_system, get_ground_truth
 from src.vector_db.loading import get_vector_db
 
 # Configure logging
@@ -60,41 +56,10 @@ def encode_ambiguous(
     parser = PydanticOutputParser(pydantic_object=RAGResponse)
     fs = get_file_system()
 
-    # Load excel files containing informations about mapping
-    table_corres = load_excel_from_fs(fs, URL_MAPPING_TABLE)
-    notes_ex = load_excel_from_fs(fs, URL_EXPLANATORY_NOTES)
-    mapping = get_mapping(notes_ex, table_corres)
-    mapping_ambiguous = [code for code in mapping if len(code.naf2025) > 1]
+    # Get data
+    data = get_data(fs, VAR_TO_KEEP, third, only_annotated=True)
+    data = data.sample(100)
 
-    # Load main data
-    ambiguous_codes = "', '".join([m.code for m in mapping_ambiguous])
-    query = f"""
-        SELECT * FROM read_parquet('{URL_SIRENE4_EXTRACTION}')
-        WHERE apet_finale IN ('{ambiguous_codes}')
-    """
-    data = load_data_from_s3(query).loc[:, VAR_TO_KEEP].drop_duplicates(subset="liasse_numero")
-
-    # We keep only non duplicated description and complementary variables
-    data = (
-        data.drop_duplicates(
-            subset=[v for v in VAR_TO_KEEP if v != "liasse_numero" and v != "apet_finale"]
-        )
-        .sort_values("liasse_numero")
-        .reset_index(drop=True)
-    )
-
-    # Load Ground Truth data
-    query = f"""SELECT * FROM read_parquet('{URL_GROUND_TRUTH}')"""
-    ground_truth = (
-        load_data_from_s3(query)
-        .loc[:, ["liasse_numero", "apet_manual", "NAF2008_code"]]
-        .drop_duplicates(subset="liasse_numero")
-        .sort_values("liasse_numero")
-        .reset_index(drop=True)
-    )
-
-    # Process data subset
-    data = process_subset(data, third)
     # Get vector db
     vector_db = get_vector_db(COLLECTION_NAME)
 
@@ -103,6 +68,9 @@ def encode_ambiguous(
     batch_prompts = [p.prompt for p in prompts]
 
     # Initialize LLM
+    local_path_model = os.path.expanduser(f"~/.cache/huggingface/hub/{llm_name}")
+    llm = LLM(model=local_path_model, **MODEL_TO_ARGS.get(llm_name, {}))
+
     sampling_params = SamplingParams(
         max_tokens=MAX_NEW_TOKEN,
         temperature=TEMPERATURE,
@@ -110,8 +78,6 @@ def encode_ambiguous(
         repetition_penalty=REP_PENALTY,
         seed=2025,
     )
-    local_path_model = os.path.expanduser(f"~/.cache/huggingface/hub/{llm_name}")
-    llm = LLM(model=local_path_model, **MODEL_TO_ARGS.get(llm_name, {}))
 
     mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI"))
     mlflow.set_experiment(experiment_name)
@@ -126,26 +92,45 @@ def encode_ambiguous(
 
         results_df = data.merge(pd.DataFrame(results), on="liasse_numero")
 
-        # Fill missing values with undefined for nace08 for parquet partition compatibility
-        results_df["nace08_valid"] = results_df["nace08_valid"].fillna("undefined").astype(str)
-
         date = datetime.now().strftime("%Y-%m-%d--%H:%M")
         pq.write_to_dataset(
             pa.Table.from_pandas(results_df),
-            root_path=f"{URL_SIRENE4_AMBIGUOUS}/{"--".join(llm_name.split("/"))}",
-            partition_cols=["nace08_valid", "codable"],
+            root_path=f"{URL_SIRENE4_AMBIGUOUS_RAG}/{"--".join(llm_name.split("/"))}",
+            partition_cols=["codable"],
             basename_template=f"part-{{i}}{f'-{third}' if third else ""}{f'--{date}'}.parquet",  # Filename template for Parquet parts
             existing_data_behavior="overwrite_or_ignore",
             filesystem=fs,
         )
 
         # EVALUATION
-        # Check if the mapping is correct
-        naf08_to_naf2025 = {m.code: [c.code for c in m.naf2025] for m in mapping}
-        ground_truth["mapping_ok"] = [
-            check_mapping(naf08, naf25, naf08_to_naf2025)
-            for naf08, naf25 in zip(ground_truth["NAF2008_code"], ground_truth["apet_manual"])
+        # Load Ground Truth data
+        ground_truth = get_ground_truth()
+
+        [
+            {
+                "liasse_numero": prompt.id,
+                "mapping_ok": ground_truth[ground_truth["liasse_numero"] == prompt.id][
+                    "apet_manual"
+                ]
+                .isin(prompt.proposed_codes)
+                .any(),
+                "position": (
+                    prompt.proposed_codes.index(
+                        ground_truth[ground_truth["liasse_numero"] == prompt.id][
+                            "apet_manual"
+                        ].values[0]
+                    )
+                    if not ground_truth[ground_truth["liasse_numero"] == prompt.id].empty
+                    and ground_truth[ground_truth["liasse_numero"] == prompt.id][
+                        "apet_manual"
+                    ].values[0]
+                    in prompt.proposed_codes
+                    else None
+                ),
+            }
+            for prompt in prompts
         ]
+
         ground_truth = ground_truth.loc[:, ["liasse_numero", "apet_manual", "mapping_ok"]]
 
         eval_df = ground_truth.merge(
@@ -194,7 +179,7 @@ def encode_ambiguous(
                 "TOP_P": TOP_P,
                 "REP_PENALTY": REP_PENALTY,
                 "input_path": URL_SIRENE4_EXTRACTION,
-                "output_path": f"{URL_SIRENE4_AMBIGUOUS}/{"--".join(llm_name.split("/"))}/part-{third if third else 0}--{date}.parquet",
+                "output_path": f"{URL_SIRENE4_AMBIGUOUS_RAG}/{"--".join(llm_name.split("/"))}/part-{third if third else 0}--{date}.parquet",
                 "num_coded": results_df["codable"].sum(),
                 "num_not_coded": len(results_df) - results_df["codable"].sum(),
                 "pct_not_coded": round(

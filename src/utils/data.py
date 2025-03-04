@@ -1,10 +1,18 @@
 import logging
 import os
-from typing import Optional
+from typing import List, Optional
 
 import duckdb
 import pandas as pd
 import s3fs
+
+from src.constants.paths import (
+    URL_EXPLANATORY_NOTES,
+    URL_GROUND_TRUTH,
+    URL_MAPPING_TABLE,
+    URL_SIRENE4_EXTRACTION,
+)
+from src.mappings.mappings import get_mapping
 
 
 def get_file_system(token=None) -> s3fs.S3FileSystem:
@@ -149,3 +157,93 @@ def process_subset(data: pd.DataFrame, third: Optional[int]) -> pd.DataFrame:
     start_idx = subset_size * (third - 1)
     end_idx = subset_size * third if third != 3 else len(data)
     return data.iloc[start_idx:end_idx]
+
+
+def get_data(fs, var_to_keep: List[str], third: bool, only_annotated: bool = False) -> pd.DataFrame:
+    """
+    Loads and processes data from multiple sources.
+
+    Args:
+        fs: File system handler.
+        var_to_keep (List[str]): List of variables to retain.
+        third (bool): Additional processing flag.
+        only_annotated (bool): Flag to filter only annotated data.
+
+    Returns:
+        pd.DataFrame: Processed subset of data.
+    """
+
+    # Load mapping data
+    try:
+        table_corres = load_excel_from_fs(fs, URL_MAPPING_TABLE)
+        notes_ex = load_excel_from_fs(fs, URL_EXPLANATORY_NOTES)
+        mapping = get_mapping(notes_ex, table_corres)
+    except Exception as e:
+        raise RuntimeError(f"Error loading mapping data: {e}")
+
+    # Identify ambiguous mappings
+    mapping_ambiguous = [code for code in mapping if len(code.naf2025) > 1]
+
+    if not mapping_ambiguous:
+        raise ValueError("No ambiguous codes found in mapping.")
+
+    # Construct SQL query
+    filter_columns_sql = ", ".join(
+        [v for v in var_to_keep if v not in {"liasse_numero", "apet_finale"}]
+    )
+    selected_columns_sql = ", ".join(var_to_keep)
+    ambiguous_codes = "', '".join([m.code for m in mapping_ambiguous])
+
+    # Filter only annotated data if specified
+    ground_truth_filter = (
+        f"AND liasse_numero IN (SELECT liasse_numero FROM read_parquet('{URL_GROUND_TRUTH}'))"
+        if only_annotated
+        else ""
+    )
+
+    query = f"""
+        WITH filtered_data AS (
+            SELECT DISTINCT ON (liasse_numero) *
+            FROM read_parquet('{URL_SIRENE4_EXTRACTION}')
+            WHERE apet_finale IN ('{ambiguous_codes}')
+            {ground_truth_filter}
+        ),
+        deduplicated_data AS (
+            SELECT DISTINCT ON ({filter_columns_sql}) *
+            FROM filtered_data
+        )
+        SELECT {selected_columns_sql}
+        FROM deduplicated_data
+        ORDER BY liasse_numero;
+    """
+
+    try:
+        data = load_data_from_s3(query)
+    except Exception as e:
+        raise RuntimeError(f"Error loading data from S3: {e}")
+
+    # Process data subset
+    return process_subset(data, third)
+
+
+def get_ground_truth() -> pd.DataFrame:
+    """
+    Retrieves and loads the ground truth data from a Parquet file.
+
+    Returns:
+        pd.DataFrame: A DataFrame with distinct liasse_numero, apet_manual, and NAF2008_code.
+    """
+
+    query = f"""
+        SELECT DISTINCT ON (liasse_numero)
+            liasse_numero,
+            apet_manual,
+            NAF2008_code
+        FROM read_parquet('{URL_GROUND_TRUTH}')
+        ORDER BY liasse_numero;
+    """
+
+    try:
+        return load_data_from_s3(query)
+    except Exception as e:
+        raise RuntimeError(f"Error loading ground truth data: {e}")
