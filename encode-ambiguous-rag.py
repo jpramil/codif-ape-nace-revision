@@ -26,10 +26,12 @@ from src.constants.paths import (
     URL_SIRENE4_AMBIGUOUS,
     URL_SIRENE4_EXTRACTION,
 )
-from src.llm.prompting import generate_prompt
-from src.llm.response import LLMResponse, process_response
+from src.constants.vector_db import COLLECTION_NAME
+from src.llm.prompting import generate_prompt_rag
+from src.llm.response import RAGResponse, process_response
 from src.mappings.mappings import check_mapping, get_mapping
 from src.utils.data import get_file_system, load_data_from_s3, load_excel_from_fs, process_subset
+from src.vector_db.loading import get_vector_db
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -55,7 +57,7 @@ def encode_ambiguous(
     llm_name: str = LLM_MODEL,
     third: int = None,
 ):
-    parser = PydanticOutputParser(pydantic_object=LLMResponse)
+    parser = PydanticOutputParser(pydantic_object=RAGResponse)
     fs = get_file_system()
 
     # Load excel files containing informations about mapping
@@ -93,26 +95,11 @@ def encode_ambiguous(
 
     # Process data subset
     data = process_subset(data, third)
-
-    # Instanciate the embedding model
-    from qdrant_client import QdrantClient
-
-    # Establish a connection
-    client = QdrantClient(
-        url="https://projet-ape-377568-0.user.lab.sspcloud.fr",
-        api_key=os.getenv("QDRANT_API_KEY"),
-        port="443",
-        https=True,
-    )
-    collection_name = "labels_embedding"
-    collection_info = client.get_collection(collection_name=collection_name)
-
-    next(iter(collection_info.config.params.vectors.keys()))
-
-    # Retrieve the relevant doc
+    # Get vector db
+    vector_db = get_vector_db(COLLECTION_NAME)
 
     # Generate prompts
-    prompts = [generate_prompt(row, mapping_ambiguous, parser) for row in data.itertuples()]
+    prompts = [generate_prompt_rag(row, vector_db, parser) for row in data.itertuples()]
     batch_prompts = [p.prompt for p in prompts]
 
     # Initialize LLM
