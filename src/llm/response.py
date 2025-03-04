@@ -24,6 +24,19 @@ class LLMResponse(BaseModel):
     )
 
 
+class RAGResponse(BaseModel):
+    """Represents a response model for classification code assignment."""
+
+    codable: bool = Field(
+        description="""True if enough information is provided to decide classification code, False otherwise."""
+    )
+
+    nace2025: Optional[str] = Field(
+        description="""NACE 2025 classification code Empty if codable=False.""",
+        default=None,
+    )
+
+
 def process_response(response: str, prompt: PromptData, parser: PydanticOutputParser) -> dict:
     try:
         validated_response = parser.parse(response)

@@ -43,6 +43,16 @@ CLASSIF_PROMPT = """\
 {format_instructions}\
 """
 
+CLASSIF_PROMPT_RAG = """\
+- Activité principale de l'entreprise :
+{activity}\n
+
+- Liste des codes NACE potentiels et leurs notes explicatives :
+{proposed_codes}\n
+
+{format_instructions}\
+"""
+
 MODEL_TO_PROMPT_FORMAT = {
     # MISTRAL
     "mistralai/Mistral-7B-Instruct-v0.3": (
