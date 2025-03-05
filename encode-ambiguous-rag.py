@@ -24,6 +24,7 @@ from src.constants.paths import (
     URL_SIRENE4_EXTRACTION,
 )
 from src.constants.vector_db import COLLECTION_NAME
+from src.evaluation.evaluation import calculate_accuracy, get_prompt_mapping
 from src.llm.prompting import generate_prompt_rag
 from src.llm.response import RAGResponse, process_response
 from src.utils.data import get_data, get_file_system, get_ground_truth
@@ -103,73 +104,19 @@ def encode_ambiguous(
         )
 
         # EVALUATION
-        # Load Ground Truth data
         ground_truth = get_ground_truth()
 
-        [
-            {
-                "liasse_numero": prompt.id,
-                "mapping_ok": ground_truth[ground_truth["liasse_numero"] == prompt.id][
-                    "apet_manual"
-                ]
-                .isin(prompt.proposed_codes)
-                .any(),
-                "position": (
-                    prompt.proposed_codes.index(
-                        ground_truth[ground_truth["liasse_numero"] == prompt.id][
-                            "apet_manual"
-                        ].values[0]
-                    )
-                    if not ground_truth[ground_truth["liasse_numero"] == prompt.id].empty
-                    and ground_truth[ground_truth["liasse_numero"] == prompt.id][
-                        "apet_manual"
-                    ].values[0]
-                    in prompt.proposed_codes
-                    else None
-                ),
-            }
-            for prompt in prompts
-        ]
+        prompt_mapping = get_prompt_mapping(prompts, ground_truth)
 
-        ground_truth = ground_truth.loc[:, ["liasse_numero", "apet_manual", "mapping_ok"]]
+        ground_truth = ground_truth.merge(prompt_mapping, on="liasse_numero", how="inner")
 
         eval_df = ground_truth.merge(
-            results_df[["liasse_numero", "nace2025", "codable"]],
-            on="liasse_numero",
-            how="inner",
+            results_df[["liasse_numero", "nace2025", "codable"]], on="liasse_numero", how="inner"
         )
 
-        accuracies_overall = {
-            f"accuracy_overall_lvl_{i}": round(
-                (eval_df["apet_manual"].str[:i] == eval_df["nace2025"].str[:i]).mean() * 100,
-                2,
-            )
-            for i in [5, 4, 3, 2, 1]
-        }
-
-        accuracies_llm = {
-            f"accuracy_llm_lvl_{i}": round(
-                (
-                    eval_df[eval_df["mapping_ok"]]["apet_manual"].str[:i]
-                    == eval_df[eval_df["mapping_ok"]]["nace2025"].str[:i]
-                ).mean()
-                * 100,
-                2,
-            )
-            for i in [5, 4, 3, 2, 1]
-        }
-
-        accuracies_codable = {
-            f"accuracy_codable_lvl_{i}": round(
-                (
-                    eval_df[eval_df["codable"]]["apet_manual"].str[:i]
-                    == eval_df[eval_df["codable"]]["nace2025"].str[:i]
-                ).mean()
-                * 100,
-                2,
-            )
-            for i in [5, 4, 3, 2, 1]
-        }
+        accuracies_overall = calculate_accuracy(eval_df)
+        accuracies_llm = calculate_accuracy(eval_df, filter_col="mapping_ok")
+        accuracies_codable = calculate_accuracy(eval_df, filter_col="codable")
 
         # Log MLflow parameters and metrics
         mlflow.log_params(
