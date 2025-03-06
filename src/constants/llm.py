@@ -23,6 +23,12 @@ MODEL_TO_ARGS = {
         "load_format": "mistral",
         "enforce_eager": True,
     },
+    "mistralai/Mistral-Small-24B-Instruct-2501": {
+        "tokenizer_mode": "mistral",
+        "config_format": "mistral",
+        "load_format": "mistral",
+        "enforce_eager": True,
+    },
     "Qwen/Qwen2.5-1.5B-Instruct": {},
     "Qwen/Qwen2.5-32B-Instruct": {
         "max_model_len": 20000,
