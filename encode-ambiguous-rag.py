@@ -69,7 +69,7 @@ def encode_ambiguous(
     batch_prompts = [p.prompt for p in prompts]
 
     # Initialize LLM
-    local_path_model = os.path.expanduser(f"{os.getenv("LOCAL_PATH")}/{llm_name}")
+    local_path_model = f"{os.getenv("LOCAL_PATH")}/{llm_name}"
     print(os.listdir(local_path_model))
     llm = LLM(model=local_path_model, **MODEL_TO_ARGS.get(llm_name, {}))
     tokenizer = llm.get_tokenizer()
