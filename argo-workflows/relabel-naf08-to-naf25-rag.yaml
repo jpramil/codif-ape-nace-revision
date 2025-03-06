@@ -35,10 +35,10 @@ spec:
         parameters:
           - name: LLM_NAME
       nodeSelector:
-        nvidia.com/gpu.product: "NVIDIA-H100-PCIe"
+        nvidia.com/gpu.product: "NVIDIA-H100-NVL"
       container:
         image: inseefrlab/onyxia-vscode-pytorch:py3.12.6-gpu
-        imagePullPolicy: Always
+        imagePullPolicy: IfNotPresent
         resources:
           limits:
             nvidia.com/gpu: 1
@@ -82,4 +82,4 @@ spec:
           - name: MLFLOW_TRACKING_URI
             value: https://projet-ape-mlflow.user.lab.sspcloud.fr/
           - name: LOCAL_PATH
-            value: ~/.cache/huggingface/hub
+            value: /home/onyxia/.cache/huggingface/hub

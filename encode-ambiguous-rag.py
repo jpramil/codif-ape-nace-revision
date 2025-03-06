@@ -59,7 +59,6 @@ def encode_ambiguous(
 
     # Get data
     data = get_data(fs, VAR_TO_KEEP, third, only_annotated=True)
-    data = data.sample(100)
 
     # Get vector db
     vector_db = get_vector_db(COLLECTION_NAME)
