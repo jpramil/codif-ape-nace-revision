@@ -71,6 +71,7 @@ def encode_ambiguous(
     # Initialize LLM
     local_path_model = os.path.expanduser(f"~/.cache/huggingface/hub/{llm_name}")
     llm = LLM(model=local_path_model, **MODEL_TO_ARGS.get(llm_name, {}))
+    tokenizer = llm.get_tokenizer()
 
     sampling_params = SamplingParams(
         max_tokens=MAX_NEW_TOKEN,
@@ -78,6 +79,7 @@ def encode_ambiguous(
         top_p=TOP_P,
         repetition_penalty=REP_PENALTY,
         seed=2025,
+        logprobs=1,
     )
 
     mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI"))
@@ -85,10 +87,18 @@ def encode_ambiguous(
     with mlflow.start_run(run_name=run_name):
         outputs = llm.chat(batch_prompts, sampling_params=sampling_params)
         responses = [output.outputs[0].text for output in outputs]
+        # We only keep the logprobs for tokens corresponding to the NACE codes (supposed to be at index 21 to 26)
+        logprobs = [output.outputs[0].logprobs[21:26] for output in outputs]
 
         results = [
-            process_response(response=response, prompt=prompt, parser=parser)
-            for response, prompt in zip(responses, prompts)
+            process_response(
+                response=response,
+                prompt=prompt,
+                parser=parser,
+                logprobs=logprob,
+                tokenizer=tokenizer,
+            )
+            for response, prompt, logprob in zip(responses, prompts, logprobs)
         ]
 
         results_df = data.merge(pd.DataFrame(results), on="liasse_numero")
