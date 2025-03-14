@@ -159,7 +159,9 @@ def process_subset(data: pd.DataFrame, third: Optional[int]) -> pd.DataFrame:
     return data.iloc[start_idx:end_idx]
 
 
-def get_data(fs, var_to_keep: List[str], third: bool, only_annotated: bool = False) -> pd.DataFrame:
+def get_ambiguous_data(
+    fs, var_to_keep: List[str], third: bool, only_annotated: bool = False
+) -> pd.DataFrame:
     """
     Loads and processes data from multiple sources.
 
@@ -223,7 +225,7 @@ def get_data(fs, var_to_keep: List[str], third: bool, only_annotated: bool = Fal
         raise RuntimeError(f"Error loading data from S3: {e}")
 
     # Process data subset
-    return process_subset(data, third)
+    return process_subset(data, third), mapping_ambiguous
 
 
 def get_ground_truth() -> pd.DataFrame:

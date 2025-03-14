@@ -27,7 +27,7 @@ from src.constants.vector_db import COLLECTION_NAME
 from src.evaluation.evaluation import calculate_accuracy, get_prompt_mapping
 from src.llm.prompting import generate_prompt_rag
 from src.llm.response import RAGResponse, process_response
-from src.utils.data import get_data, get_file_system, get_ground_truth
+from src.utils.data import get_ambiguous_data, get_file_system, get_ground_truth
 from src.vector_db.loading import get_vector_db
 
 # Configure logging
@@ -58,7 +58,8 @@ def encode_ambiguous(
     fs = get_file_system()
 
     # Get data
-    data = get_data(fs, VAR_TO_KEEP, third, only_annotated=True)
+    data, _ = get_ambiguous_data(fs, VAR_TO_KEEP, third, only_annotated=True)
+    data = data.iloc[:200]
 
     # Get vector db
     vector_db = get_vector_db(COLLECTION_NAME)
@@ -68,8 +69,7 @@ def encode_ambiguous(
     batch_prompts = [p.prompt for p in prompts]
 
     # Initialize LLM
-    local_path_model = f"{os.getenv("LOCAL_PATH")}/{llm_name}"
-    print(os.listdir(local_path_model))
+    local_path_model = f"{os.getenv('LOCAL_PATH')}/{llm_name}"
     llm = LLM(model=local_path_model, **MODEL_TO_ARGS.get(llm_name, {}))
     tokenizer = llm.get_tokenizer()
 
@@ -106,9 +106,9 @@ def encode_ambiguous(
         date = datetime.now().strftime("%Y-%m-%d--%H:%M")
         pq.write_to_dataset(
             pa.Table.from_pandas(results_df),
-            root_path=f"{URL_SIRENE4_AMBIGUOUS_RAG}/{"--".join(llm_name.split("/"))}",
+            root_path=f"{URL_SIRENE4_AMBIGUOUS_RAG}/{'--'.join(llm_name.split('/'))}",
             partition_cols=["codable"],
-            basename_template=f"part-{{i}}{f'-{third}' if third else ""}{f'--{date}'}.parquet",  # Filename template for Parquet parts
+            basename_template=f"part-{{i}}{f'-{third}' if third else ''}{f'--{date}'}.parquet",  # Filename template for Parquet parts
             existing_data_behavior="overwrite_or_ignore",
             filesystem=fs,
         )
@@ -136,7 +136,7 @@ def encode_ambiguous(
                 "TOP_P": TOP_P,
                 "REP_PENALTY": REP_PENALTY,
                 "input_path": URL_SIRENE4_EXTRACTION,
-                "output_path": f"{URL_SIRENE4_AMBIGUOUS_RAG}/{"--".join(llm_name.split("/"))}/part-{third if third else 0}--{date}.parquet",
+                "output_path": f"{URL_SIRENE4_AMBIGUOUS_RAG}/{'--'.join(llm_name.split('/'))}/part-{third if third else 0}--{date}.parquet",
                 "num_coded": results_df["codable"].sum(),
                 "num_not_coded": len(results_df) - results_df["codable"].sum(),
                 "pct_not_coded": round(
@@ -154,9 +154,9 @@ def encode_ambiguous(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Recode into NACE2025 nomenclature")
 
-    assert (
-        "MLFLOW_TRACKING_URI" in os.environ
-    ), "Please set the MLFLOW_TRACKING_URI environment variable."
+    assert "MLFLOW_TRACKING_URI" in os.environ, (
+        "Please set the MLFLOW_TRACKING_URI environment variable."
+    )
 
     parser.add_argument(
         "--experiment_name",

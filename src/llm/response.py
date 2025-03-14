@@ -8,20 +8,20 @@ from pydantic import BaseModel, Field
 from src.llm.prompting import PromptData
 
 
-class LLMResponse(BaseModel):
+class CAGResponse(BaseModel):
     """Represents a response model for classification code assignment."""
 
     codable: bool = Field(
         description="""True if enough information is provided to decide classification code, False otherwise."""
     )
 
-    nace08_valid: Optional[bool] = Field(
-        description="""True if the NACE08 classification seems valid with the description of the activity, False otherwise.""",
+    nace2025: Optional[str] = Field(
+        description="""NACE 2025 classification code Empty if codable=False.""",
         default=None,
     )
 
-    nace2025: Optional[str] = Field(
-        description="""NACE 2025 classification code Empty if codable=False.""",
+    nace08_valid: Optional[bool] = Field(
+        description="""True if the NACE08 classification seems valid with the description of the activity, False otherwise.""",
         default=None,
     )
 
@@ -51,7 +51,10 @@ def process_response(
     except ValueError as parse_error:
         # Log an error and return an un-codable response if parsing fails.
         logging.warning(f"Failed to parse response for id {prompt.id}: {parse_error}")
-        validated_response = LLMResponse(codable=False, nace08_valid=None, nace2025=None)
+        if parser.pydantic_object is CAGResponse:
+            validated_response = CAGResponse(codable=False, nace08_valid=None, nace2025=None)
+        else:
+            validated_response = RAGResponse(codable=False, nace2025=None)
 
     if validated_response.nace2025 not in prompt.proposed_codes:
         logging.warning(

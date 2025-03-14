@@ -1,7 +1,12 @@
 import re
 from collections import defaultdict, namedtuple
 
-from src.constants.prompting import CLASSIF_PROMPT, CLASSIF_PROMPT_RAG, SYS_PROMPT
+from src.constants.prompting import (
+    CLASSIF_PROMPT_CAG,
+    CLASSIF_PROMPT_RAG,
+    SYS_PROMPT_CAG,
+    SYS_PROMPT_RAG,
+)
 
 PromptData = namedtuple("PromptData", ["id", "proposed_codes", "prompt"])
 
@@ -49,7 +54,7 @@ def extract_info(nace2025, paragraphs: list[str]):
     return "\n\n".join(info) if info else ""
 
 
-def generate_prompt(row, mapping, parser):
+def generate_prompt_cag(row, mapping, parser):
     nace08 = row.apet_finale
     activity = row.libelle.lower() if row.libelle.isupper() else row.libelle
     row_id = row.liasse_numero
@@ -63,7 +68,8 @@ def generate_prompt(row, mapping, parser):
         activity += f"\nAutre nature d'activité : {specs_nature.lower()}"
 
     proposed_codes = next((m.naf2025 for m in mapping if m.code == nace08))
-    prompt = CLASSIF_PROMPT.format(
+
+    prompt = CLASSIF_PROMPT_CAG.format(
         **{
             "activity": activity,
             "nace08": format_code08([next((m for m in mapping if m.code == nace08))]),
@@ -77,7 +83,7 @@ def generate_prompt(row, mapping, parser):
         id=row_id,
         proposed_codes=[c.code for c in proposed_codes],
         prompt=[
-            {"role": "system", "content": SYS_PROMPT},
+            {"role": "system", "content": SYS_PROMPT_CAG},
             {"role": "user", "content": prompt},
         ],
     )
@@ -132,7 +138,7 @@ def generate_prompt_rag(row, retriever, parser):
         id=row_id,
         proposed_codes=[c[0].metadata["code"] for c in retrieved_docs],
         prompt=[
-            {"role": "system", "content": SYS_PROMPT},
+            {"role": "system", "content": SYS_PROMPT_RAG},
             {"role": "user", "content": prompt},
         ],
     )
