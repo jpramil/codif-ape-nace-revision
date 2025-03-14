@@ -14,10 +14,13 @@ spec:
     parameters:
       - name: params-conf-list
         value: '[
-              {"LLM_NAME": "mistralai/Ministral-8B-Instruct-2410"},
-              {"LLM_NAME": "mistralai/Mistral-Small-24B-Instruct-2501"},
-              {"LLM_NAME": "Qwen/Qwen2.5-32B-Instruct"}
-            ]'
+          {"LLM_NAME": "mistralai/Ministral-8B-Instruct-2410", "METHOD": "rag"},
+          {"LLM_NAME": "mistralai/Mistral-Small-24B-Instruct-2501", "METHOD": "rag"},
+          {"LLM_NAME": "Qwen/Qwen2.5-32B-Instruct", "METHOD": "rag"},
+          {"LLM_NAME": "mistralai/Ministral-8B-Instruct-2410", "METHOD": "cag"},
+          {"LLM_NAME": "mistralai/Mistral-Small-24B-Instruct-2501", "METHOD": "cag"},
+          {"LLM_NAME": "Qwen/Qwen2.5-32B-Instruct", "METHOD": "cag"}
+          ]'
 
   templates:
     - name: main
@@ -28,14 +31,25 @@ spec:
             arguments:
               parameters:
                 - name: LLM_NAME
-                  value: '{{item.LLM_NAME}}'
-            withParam: '{{workflow.parameters.params-conf-list}}'
+                  value: "{{item.LLM_NAME}}"
+                - name: METHOD
+                  value: "{{item.METHOD}}"
+            withParam: "{{workflow.parameters.params-conf-list}}"
     - name: run-relabel
       inputs:
         parameters:
           - name: LLM_NAME
-      nodeSelector:
-        nvidia.com/gpu.product: "NVIDIA-H100-NVL"
+          - name: METHOD
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: nvidia.com/gpu.product
+                    operator: In
+                    values:
+                      - NVIDIA-H100-NVL
+                      - NVIDIA-H100-PCIe
       container:
         image: inseefrlab/onyxia-vscode-pytorch:py3.12.6-gpu
         imagePullPolicy: IfNotPresent
@@ -47,12 +61,17 @@ spec:
           - |
             git clone https://github.com/InseeFrLab/codif-ape-nace-revision.git
             cd codif-ape-nace-revision/
-            pip install -r requirements.txt
+            pip install uv
+            uv pip install -r requirements.txt
 
             export MC_HOST_s3=https://$AWS_ACCESS_KEY_ID:$AWS_SECRET_ACCESS_KEY@$AWS_S3_ENDPOINT
             ./bash/fetch_model_s3.sh {{inputs.parameters.LLM_NAME}} $LOCAL_PATH
 
-            python encode-ambiguous-rag.py --experiment_name NACE2025_DATASET --llm_name {{inputs.parameters.LLM_NAME}}
+            if [ "{{inputs.parameters.METHOD}}" != "cag" ]; then
+              uv run encode-ambiguous-{{inputs.parameters.METHOD}}.py --experiment_name NACE2025_DATASET --llm_name {{inputs.parameters.LLM_NAME}} --prompts_from_file 1
+            else
+              uv run encode-ambiguous-{{inputs.parameters.METHOD}}.py --experiment_name NACE2025_DATASET --llm_name {{inputs.parameters.LLM_NAME}}
+            fi
         volumeMounts:
           - mountPath: /dev/shm
             name: dshm
@@ -83,3 +102,7 @@ spec:
             value: https://projet-ape-mlflow.user.lab.sspcloud.fr/
           - name: LOCAL_PATH
             value: /home/onyxia/.cache/huggingface/hub
+          - name: VLLM_USE_V1
+            value: "1"
+          - name: VLLM_USE_FLASHINFER_SAMPLER
+            value: "0"
