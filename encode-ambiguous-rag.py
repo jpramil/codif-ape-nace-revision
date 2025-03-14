@@ -70,7 +70,11 @@ def encode_ambiguous(
 
     # Initialize LLM
     local_path_model = f"{os.getenv('LOCAL_PATH')}/{llm_name}"
-    llm = LLM(model=local_path_model, **MODEL_TO_ARGS.get(llm_name, {}))
+    llm = LLM(
+        model=local_path_model,
+        **MODEL_TO_ARGS.get(llm_name, {}),
+        hf_overrides={"sliding_window": None},
+    )
     tokenizer = llm.get_tokenizer()
 
     sampling_params = SamplingParams(
