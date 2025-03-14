@@ -1,4 +1,9 @@
-from collections import defaultdict, namedtuple
+from collections import namedtuple
+from typing import Any, List, Optional, Tuple
+
+import pandas as pd
+from langchain_core.output_parsers import PydanticOutputParser
+from langchain_qdrant import QdrantVectorStore
 
 from src.constants.prompting import (
     CLASSIF_PROMPT_CAG,
@@ -6,7 +11,9 @@ from src.constants.prompting import (
     SYS_PROMPT_CAG,
     SYS_PROMPT_RAG,
 )
+from src.llm.response import RAGResponse
 
+# TODO create a class instead of a namedtuple
 PromptData = namedtuple("PromptData", ["id", "proposed_codes", "prompt"])
 
 
@@ -49,106 +56,112 @@ def extract_info(nace2025, paragraphs: list[str]):
     return "\n\n".join(info) if info else ""
 
 
-def generate_prompt_cag(row, mapping, parser):
-    nace08 = f"{row.apet_finale[:2]}.{row.apet_finale[2:]}"
+def build_activity_description(row) -> str:
     activity = row.libelle.lower() if row.libelle.isupper() else row.libelle
-    row_id = row.liasse_numero
 
-    specs_agriculture = row.activ_sec_agri_et
-    specs_nature = row.activ_nat_lib_et
+    if row.activ_sec_agri_et:
+        activity += f"\nPrécisions sur l'activité agricole : {row.activ_sec_agri_et.lower()}"
 
-    if specs_agriculture is not None:
-        activity += f"\nPrécisions sur l'activité agricole : {specs_agriculture.lower()}"
-    if specs_nature is not None:
-        activity += f"\nAutre nature d'activité : {specs_nature.lower()}"
+    if row.activ_nat_lib_et:
+        activity += f"\nAutre nature d'activité : {row.activ_nat_lib_et.lower()}"
 
-    proposed_codes = next((m.naf2025 for m in mapping if m.code == nace08))
-
-    prompt = CLASSIF_PROMPT_CAG.format(
-        **{
-            "activity": activity,
-            "nace08": format_code08([next((m for m in mapping if m.code == nace08))]),
-            "proposed_codes": format_code25(
-                proposed_codes, paragraphs=["include", "not_include", "notes"]
-            ),
-            "format_instructions": parser.get_format_instructions(),
-        }
-    )
-    return PromptData(
-        id=row_id,
-        proposed_codes=[c.code for c in proposed_codes],
-        prompt=[
-            {"role": "system", "content": SYS_PROMPT_CAG},
-            {"role": "user", "content": prompt},
-        ],
-    )
+    return activity
 
 
-def generate_prompt_rag(row, retriever, parser):
-    """
-    Generate a prompt for the LLM model.
-
-    Parameters:
-    ----------
-    row : pd.Series
-        A row of the dataset.
-    retriever : QdrantVectorStore
-        A retriever object to retrieve relevant documents.
-    parser : PydanticOutputParser
-        A parser object to parse the LLM response.
-
-    Returns:
-    -------
-    PromptData
-        A dataclass containing the prompt and the relevant information.
-    """
-
-    activity = row.libelle.lower() if row.libelle.isupper() else row.libelle
-    row_id = row.liasse_numero
-
-    specs_agriculture = row.activ_sec_agri_et
-    specs_nature = row.activ_nat_lib_et
-
-    if specs_agriculture is not None:
-        activity += f"\nPrécisions sur l'activité agricole : {specs_agriculture.lower()}"
-    if specs_nature is not None:
-        activity += f"\nAutre nature d'activité : {specs_nature.lower()}"
-
+def create_specific_prompt_rag(activity: str, parser: Any, retriever: Any) -> str:
     retrieved_docs = retriever.similarity_search_with_relevance_scores(
         query=f"query : {activity}", k=5, score_threshold=0.5
     )
 
-    # retrieved_docs = retriever.similarity_search(
-    #             query=f"query : {activity}", k=5,
-    #         )
-
     prompt = CLASSIF_PROMPT_RAG.format(
-        **{
-            "activity": activity,
-            "proposed_codes": format_docs(retrieved_docs),
-            "format_instructions": parser.get_format_instructions(),
-        }
+        activity=activity,
+        proposed_codes=format_docs(retrieved_docs),
+        format_instructions=parser.get_format_instructions(),
     )
+    proposed_codes = [c[0].metadata["code"] for c in retrieved_docs]
+
+    return prompt, proposed_codes
+
+
+def create_specific_prompt_cag(activity: str, parser: Any, row: Any, mapping: Any) -> str:
+    nace08 = f"{row.apet_finale[:2]}.{row.apet_finale[2:]}"
+
+    proposed_codes = next((m.naf2025 for m in mapping if m.code == nace08))
+
+    prompt = CLASSIF_PROMPT_CAG.format(
+        activity=activity,
+        nace08=format_code08([next((m for m in mapping if m.code == nace08))]),
+        proposed_codes=format_code25(
+            proposed_codes, paragraphs=["include", "not_include", "notes"]
+        ),
+        format_instructions=parser.get_format_instructions(),
+    )
+    return prompt, [c.code for c in proposed_codes]
+
+
+def generate_prompt(
+    row: pd.Series,
+    parser: PydanticOutputParser,
+    retriever: Optional[QdrantVectorStore] = None,
+    mapping: Optional[Any] = None,
+) -> Tuple[int, List[str], str, str]:
+    row_id = row.liasse_numero
+    activity = build_activity_description(row)
+
+    if parser.pydantic_object is RAGResponse:
+        if retriever is None:
+            raise ValueError("Retriever instance must be provided for RAGResponse.")
+        prompt, proposed_codes = create_specific_prompt_rag(activity, parser, retriever)
+        system_prompt = SYS_PROMPT_RAG
+    else:
+        if mapping is None:
+            raise ValueError("Mapping data must be provided for CAGResponses.")
+        prompt, proposed_codes = create_specific_prompt_cag(activity, parser, row, mapping)
+        system_prompt = SYS_PROMPT_CAG
+
+    return row_id, proposed_codes, prompt, system_prompt
+
+
+def create_prompt_data_obj(
+    row: pd.Series,
+    parser: PydanticOutputParser,
+    retriever: Optional[QdrantVectorStore] = None,
+    mapping: Optional[Any] = None,
+) -> PromptData:
+    row_id, proposed_codes, prompt, system_prompt = generate_prompt(row, parser, retriever, mapping)
+
     return PromptData(
         id=row_id,
-        proposed_codes=[c[0].metadata["code"] for c in retrieved_docs],
+        proposed_codes=proposed_codes,
         prompt=[
-            {"role": "system", "content": SYS_PROMPT_RAG},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt},
         ],
     )
 
 
-def apply_template(messages, template):
-    # Define an inner function to handle the core logic for one list of messages
-    def format_single_prompt(message_list):
-        prompt_data = {f"{message['role']}_prompt": message["content"] for message in message_list}
-        return template.format_map(defaultdict(str, prompt_data))
+def load_prompts_from_file(url: str, fs) -> List[PromptData]:
+    prompts_df = pd.read_parquet(url, filesystem=fs)
+    return [
+        PromptData(
+            id=row_id,
+            proposed_codes=proposed_codes,
+            prompt=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        for row_id, proposed_codes, prompt, system_prompt in prompts_df.itertuples(index=False)
+    ]
 
-    # Check if input is a list of lists
-    if isinstance(messages[0], list):
-        # It's a list of lists, return a list of formatted prompts
-        return [format_single_prompt(message_list) for message_list in messages]
-    else:
-        # It's a single list of messages, return one formatted prompt
-        return format_single_prompt(messages)
+
+def generate_prompts_from_data(
+    data: pd.DataFrame,
+    parser: PydanticOutputParser,
+    retriever: Optional[QdrantVectorStore] = None,
+    mapping: Optional[Any] = None,
+) -> List[PromptData]:
+    return [
+        create_prompt_data_obj(row, parser, retriever=retriever, mapping=mapping)
+        for row in data.itertuples()
+    ]

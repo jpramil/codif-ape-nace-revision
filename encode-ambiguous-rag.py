@@ -11,6 +11,7 @@ from langchain_core.output_parsers import PydanticOutputParser
 from vllm import LLM
 from vllm.sampling_params import SamplingParams
 
+from src.constants.data import VAR_TO_KEEP
 from src.constants.llm import (
     LLM_MODEL,
     MAX_NEW_TOKEN,
@@ -19,13 +20,10 @@ from src.constants.llm import (
     TEMPERATURE,
     TOP_P,
 )
-from src.constants.paths import (
-    URL_SIRENE4_AMBIGUOUS_RAG,
-    URL_SIRENE4_EXTRACTION,
-)
+from src.constants.paths import URL_PROMPTS_RAG, URL_SIRENE4_AMBIGUOUS_RAG, URL_SIRENE4_EXTRACTION
 from src.constants.vector_db import COLLECTION_NAME
 from src.evaluation.evaluation import calculate_accuracy, get_prompt_mapping
-from src.llm.prompting import generate_prompt_rag
+from src.llm.prompting import generate_prompts_from_data, load_prompts_from_file
 from src.llm.response import RAGResponse, process_response
 from src.utils.data import get_ambiguous_data, get_file_system, get_ground_truth
 from src.vector_db.loading import get_vector_db
@@ -33,25 +31,12 @@ from src.vector_db.loading import get_vector_db
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-VAR_TO_KEEP = [
-    "liasse_numero",
-    "apet_finale",
-    "libelle",
-    "evenement_type",
-    "cj",
-    "activ_nat_et",
-    "liasse_type",
-    "activ_surf_et",
-    "activ_sec_agri_et",
-    "activ_nat_lib_et",
-    "activ_perm_et",
-]
-
 
 def encode_ambiguous(
     experiment_name: str,
     run_name: str,
     llm_name: str = LLM_MODEL,
+    prompts_from_file: bool = True,
     third: int = None,
 ):
     parser = PydanticOutputParser(pydantic_object=RAGResponse)
@@ -60,12 +45,13 @@ def encode_ambiguous(
     # Get data
     data, _ = get_ambiguous_data(fs, VAR_TO_KEEP, third, only_annotated=True)
     data = data.iloc[:200]
+    # Get prompts
+    if prompts_from_file:
+        prompts = load_prompts_from_file(URL_PROMPTS_RAG, fs)
+    else:
+        vector_db = get_vector_db(COLLECTION_NAME)
+        prompts = generate_prompts_from_data(data, parser, retriever=vector_db)
 
-    # Get vector db
-    vector_db = get_vector_db(COLLECTION_NAME)
-
-    # Generate prompts
-    prompts = [generate_prompt_rag(row, vector_db, parser) for row in data.itertuples()]
     batch_prompts = [p.prompt for p in prompts]
 
     # Initialize LLM
@@ -183,6 +169,12 @@ if __name__ == "__main__":
         default=LLM_MODEL,
         help="LLM model name",
         choices=MODEL_TO_ARGS.keys(),
+    )
+    parser.add_argument(
+        "--prompts_from_file",
+        type=bool,
+        default=True,
+        help="Whether to use prompts from file",
     )
     parser.add_argument(
         "--third",

@@ -11,6 +11,7 @@ from langchain_core.output_parsers import PydanticOutputParser
 from vllm import LLM
 from vllm.sampling_params import SamplingParams
 
+from src.constants.data import VAR_TO_KEEP
 from src.constants.llm import (
     LLM_MODEL,
     MAX_NEW_TOKEN,
@@ -24,26 +25,12 @@ from src.constants.paths import (
     URL_SIRENE4_EXTRACTION,
 )
 from src.evaluation.evaluation import calculate_accuracy, get_prompt_mapping
-from src.llm.prompting import generate_prompt_cag
+from src.llm.prompting import generate_prompts_from_data
 from src.llm.response import CAGResponse, process_response
 from src.utils.data import get_ambiguous_data, get_file_system, get_ground_truth
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-
-VAR_TO_KEEP = [
-    "liasse_numero",
-    "apet_finale",
-    "libelle",
-    "evenement_type",
-    "cj",
-    "activ_nat_et",
-    "liasse_type",
-    "activ_surf_et",
-    "activ_sec_agri_et",
-    "activ_nat_lib_et",
-    "activ_perm_et",
-]
 
 
 def encode_ambiguous(
@@ -60,7 +47,7 @@ def encode_ambiguous(
     data = data.iloc[:200]
 
     # Generate prompts
-    prompts = [generate_prompt_cag(row, mapping_ambiguous, parser) for row in data.itertuples()]
+    prompts = generate_prompts_from_data(data, parser, mapping=mapping_ambiguous)
     batch_prompts = [p.prompt for p in prompts]
 
     # Initialize LLM

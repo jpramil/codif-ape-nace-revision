@@ -13,3 +13,4 @@ URL_SIRENE4_NACE2025 = (
 URL_MAPPING_TABLE = "s3://projet-ape/NAF-revision/table-correspondance-naf2025.xls"
 URL_EXPLANATORY_NOTES = "s3://projet-ape/NAF-revision/Notes explicatives NACE et NAF.xlsx"
 URL_GROUND_TRUTH = "s3://projet-ape/label-studio/annotation-campaign-2024/rev-NAF2025/preprocessed/training_data_NAF2025.parquet"
+URL_PROMPTS_RAG = "s3://projet-ape/NAF-revision/prompts/prompts-rag.parquet"

@@ -5,8 +5,6 @@ import torch
 from langchain_core.output_parsers import PydanticOutputParser
 from pydantic import BaseModel, Field
 
-from src.llm.prompting import PromptData
-
 
 class CAGResponse(BaseModel):
     """Represents a response model for classification code assignment."""
@@ -41,7 +39,7 @@ class RAGResponse(BaseModel):
 
 def process_response(
     response: str,
-    prompt: PromptData,
+    prompt: Any,
     parser: PydanticOutputParser,
     logprobs: List = None,
     tokenizer=None,
