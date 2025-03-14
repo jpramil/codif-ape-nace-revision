@@ -54,7 +54,7 @@ def extract_info(nace2025, paragraphs: list[str]):
     return "\n\n".join(info) if info else ""
 
 
-def generate_prompt_cag(row, mapping, parser):
+def generate_prompt_cag(row, mapping):
     nace08 = row.apet_finale
     activity = row.libelle.lower() if row.libelle.isupper() else row.libelle
     row_id = row.liasse_numero
@@ -76,7 +76,6 @@ def generate_prompt_cag(row, mapping, parser):
             "proposed_codes": format_code25(
                 proposed_codes, paragraphs=["include", "not_include", "notes"]
             ),
-            "format_instructions": parser.get_format_instructions(),
         }
     )
     return PromptData(
@@ -89,7 +88,7 @@ def generate_prompt_cag(row, mapping, parser):
     )
 
 
-def generate_prompt_rag(row, retriever, parser):
+def generate_prompt_rag(row, retriever):
     """
     Generate a prompt for the LLM model.
 
@@ -99,8 +98,6 @@ def generate_prompt_rag(row, retriever, parser):
         A row of the dataset.
     retriever : QdrantVectorStore
         A retriever object to retrieve relevant documents.
-    parser : PydanticOutputParser
-        A parser object to parse the LLM response.
 
     Returns:
     -------
@@ -128,11 +125,7 @@ def generate_prompt_rag(row, retriever, parser):
     #         )
 
     prompt = CLASSIF_PROMPT_RAG.format(
-        **{
-            "activity": activity,
-            "proposed_codes": format_docs(retrieved_docs),
-            "format_instructions": parser.get_format_instructions(),
-        }
+        **{"activity": activity, "proposed_codes": format_docs(retrieved_docs)}
     )
     return PromptData(
         id=row_id,

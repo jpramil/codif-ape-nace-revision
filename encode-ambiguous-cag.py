@@ -7,9 +7,8 @@ import mlflow
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
-from langchain_core.output_parsers import PydanticOutputParser
 from vllm import LLM
-from vllm.sampling_params import SamplingParams
+from vllm.sampling_params import GuidedDecodingParams, SamplingParams
 
 from src.constants.llm import (
     LLM_MODEL,
@@ -52,7 +51,6 @@ def encode_ambiguous(
     llm_name: str = LLM_MODEL,
     third: int = None,
 ):
-    parser = PydanticOutputParser(pydantic_object=CAGResponse)
     fs = get_file_system()
 
     # Get data
@@ -60,7 +58,7 @@ def encode_ambiguous(
     data = data.iloc[:200]
 
     # Generate prompts
-    prompts = [generate_prompt_cag(row, mapping_ambiguous, parser) for row in data.itertuples()]
+    prompts = [generate_prompt_cag(row, mapping_ambiguous) for row in data.itertuples()]
     batch_prompts = [p.prompt for p in prompts]
 
     # Initialize LLM
@@ -68,7 +66,10 @@ def encode_ambiguous(
     llm = LLM(model=local_path_model, **MODEL_TO_ARGS.get(llm_name, {}))
     tokenizer = llm.get_tokenizer()
 
+    model_response = CAGResponse
+
     sampling_params = SamplingParams(
+        guided_decoding=GuidedDecodingParams(json=model_response.model_json_schema()),
         max_tokens=MAX_NEW_TOKEN,
         temperature=TEMPERATURE,
         top_p=TOP_P,
@@ -90,7 +91,6 @@ def encode_ambiguous(
             process_response(
                 response=response,
                 prompt=prompt,
-                parser=parser,
                 logprobs=logprob,
                 tokenizer=tokenizer,
             )

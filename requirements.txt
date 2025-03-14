@@ -13,3 +13,4 @@ optimum
 langchain_community
 langchain_huggingface
 langchain_qdrant
+flashinfer-python # https://github.com/vllm-project/vllm/blob/main/vllm/v1/sample/ops/topk_topp_sampler.py#L175 When success will be removed can drop the == also see https://github.com/vllm-project/vllm/pull/14815

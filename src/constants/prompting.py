@@ -15,9 +15,7 @@ CLASSIF_PROMPT_CAG = """\
 {nace08}
 
 - Liste des codes NACE potentiels et leurs notes explicatives :
-{proposed_codes}
-
-{format_instructions}\
+{proposed_codes}\
 """
 
 SYS_PROMPT_RAG = """\
@@ -33,9 +31,7 @@ CLASSIF_PROMPT_RAG = """\
 {activity}\n
 
 - Liste des codes NACE potentiels et leurs notes explicatives :
-{proposed_codes}\n
-
-{format_instructions}\
+{proposed_codes}\
 """
 
 MODEL_TO_PROMPT_FORMAT = {

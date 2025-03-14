@@ -1,8 +1,7 @@
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import torch
-from langchain_core.output_parsers import PydanticOutputParser
 from pydantic import BaseModel, Field
 
 from src.llm.prompting import PromptData
@@ -42,16 +41,16 @@ class RAGResponse(BaseModel):
 def process_response(
     response: str,
     prompt: PromptData,
-    parser: PydanticOutputParser,
+    base_model: Union[CAGResponse, RAGResponse],
     logprobs: List = None,
     tokenizer=None,
 ) -> dict:
     try:
-        validated_response = parser.parse(response)
+        validated_response = response
     except ValueError as parse_error:
         # Log an error and return an un-codable response if parsing fails.
         logging.warning(f"Failed to parse response for id {prompt.id}: {parse_error}")
-        if parser.pydantic_object is CAGResponse:
+        if base_model is CAGResponse:
             validated_response = CAGResponse(codable=False, nace08_valid=None, nace2025=None)
         else:
             validated_response = RAGResponse(codable=False, nace2025=None)
