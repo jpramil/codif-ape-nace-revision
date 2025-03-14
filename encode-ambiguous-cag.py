@@ -87,8 +87,8 @@ def encode_ambiguous(
         outputs = llm.chat(batch_prompts, sampling_params=sampling_params)
         responses = [output.outputs[0].text for output in outputs]
 
-        # We only keep the logprobs for tokens corresponding to the NACE codes (supposed to be at index 21 to 26)
-        logprobs = [output.outputs[0].logprobs[21:26] for output in outputs]
+        # We only keep the logprobs for tokens corresponding to the NACE codes (supposed to be at index 21 to 27)
+        logprobs = [output.outputs[0].logprobs[21:27] for output in outputs]
 
         results = [
             process_response(
@@ -102,6 +102,8 @@ def encode_ambiguous(
         ]
 
         results_df = data.merge(pd.DataFrame(results), on="liasse_numero")
+        # Back to code without dot
+        results_df["nace2025"] = results_df["nace2025"].str.replace(".", "", regex=False)
 
         # Fill missing values with undefined for nace08 for parquet partition compatibility
         results_df["nace08_valid"] = results_df["nace08_valid"].fillna("undefined").astype(str)

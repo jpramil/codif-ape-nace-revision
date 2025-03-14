@@ -40,10 +40,10 @@ def format_mapping_table(mapping_table: str) -> str:
         mapping_table.iloc[:, [1, 3, 2, 10, 5, 11]]
         .rename(columns=columns_mapping)
         .assign(
-            naf08_niv5=mapping_table.iloc[:, 1].str.replace(".", "", regex=False),
-            naf08_niv4=mapping_table.iloc[:, 3].str.replace(".", "", regex=False),
-            naf25_niv4=mapping_table.iloc[:, 5].str.replace(".", "", regex=False),
-            naf25_niv5=mapping_table.iloc[:, 10].str.replace(".", "", regex=False),
+            naf08_niv5=mapping_table.iloc[:, 1],
+            naf08_niv4=mapping_table.iloc[:, 3],
+            naf25_niv4=mapping_table.iloc[:, 5],
+            naf25_niv5=mapping_table.iloc[:, 10],
         )
         .copy()
     )
@@ -59,7 +59,7 @@ def format_explanatory_notes(explanatory_notes: str) -> str:
                 "Note.générale": "notes",
             }
         )
-        .assign(naf08_niv4=explanatory_notes["Code NAF 2025"].str.replace(".", "", regex=False))
+        .assign(naf08_niv4=explanatory_notes["Code NAF 2025"])
     )
 
 

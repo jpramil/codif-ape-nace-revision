@@ -194,7 +194,7 @@ def get_ambiguous_data(
         [v for v in var_to_keep if v not in {"liasse_numero", "apet_finale"}]
     )
     selected_columns_sql = ", ".join(var_to_keep)
-    ambiguous_codes = "', '".join([m.code for m in mapping_ambiguous])
+    ambiguous_codes = "', '".join([m.code.replace(".", "") for m in mapping_ambiguous])
 
     # Filter only annotated data if specified
     ground_truth_filter = (

@@ -1,4 +1,3 @@
-import re
 from collections import defaultdict, namedtuple
 
 from src.constants.prompting import (
@@ -43,11 +42,7 @@ def format_docs(docs: list):
 
 def extract_info(nace2025, paragraphs: list[str]):
     info = [
-        re.sub(
-            r"\d{2}\.\d{2}[A-Z]?|\d{2}\.\d{1}[A-Z]?|, voir groupe|, voir",
-            "",
-            getattr(nace2025, paragraph),
-        )
+        getattr(nace2025, paragraph)
         for paragraph in paragraphs
         if getattr(nace2025, paragraph) is not None
     ]
@@ -55,7 +50,7 @@ def extract_info(nace2025, paragraphs: list[str]):
 
 
 def generate_prompt_cag(row, mapping, parser):
-    nace08 = row.apet_finale
+    nace08 = f"{row.apet_finale[:2]}.{row.apet_finale[2:]}"
     activity = row.libelle.lower() if row.libelle.isupper() else row.libelle
     row_id = row.liasse_numero
 
