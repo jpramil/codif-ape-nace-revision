@@ -28,10 +28,16 @@ It provides tools for **automated classification and evaluation of business acti
 ## 🚀 Getting Started
 
 ### 🛠 Installation
-Ensure you have **Python 3.12+** installed, then install the required dependencies:
+Ensure you have **Python 3.12+** and **uv** or **pip** installed, then install the required dependencies:
 
 ```bash
-pip install -r requirements.txt
+uv pip install -r requirements.txt
+```
+
+or
+
+```bash
+uv pip install -r pyproject.toml
 ```
 
 ### 🏗 Pre-commit Setup

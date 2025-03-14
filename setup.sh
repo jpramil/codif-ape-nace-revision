@@ -1,10 +1,11 @@
 #!/bin/bash
-
-pip install -r requirements.txt
+pip install uv
+uv pip install -r requirements.txt
 
 pre-commit install
 
-MODEL_NAME=mistralai/Ministral-8B-Instruct-2410
-LOCAL_PATH=~/.cache/huggingface/hub
+export MODEL_NAME=mistralai/Ministral-8B-Instruct-2410
+export LOCAL_PATH=/home/onyxia/.cache/huggingface/hub
+export QDRANT_API_KEY=***
 
 ./bash/fetch_model_s3.sh $MODEL_NAME $LOCAL_PATH
