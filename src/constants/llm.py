@@ -43,18 +43,9 @@ MODEL_TO_ARGS = {
         "max_num_batched_tokens": 2048,
     },
     "meta-llama/Meta-Llama-3.1-8B-Instruct": {},
-    "hugging-quants/Meta-Llama-3.1-70B-Instruct-GPTQ-INT4": {
-        "max_model_len": 8192,
+    "google/gemma-3-27b-it": {
         "gpu_memory_utilization": 1.0,
         "enforce_eager": True,
         "enable_chunked_prefill": True,
-        "max_num_batched_tokens": 2048,
-    },
-    "neuralmagic/Llama-3.1-Nemotron-70B-Instruct-HF-FP8-dynamic": {
-        "max_model_len": 8192,
-        "gpu_memory_utilization": 1.0,
-        "enforce_eager": True,
-        "enable_chunked_prefill": True,
-        "max_num_batched_tokens": 2048,
     },
 }
