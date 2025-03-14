@@ -20,6 +20,8 @@ dependencies = [
     "transformers>=4.44.2",
     "vllm>=0.6.1",
     "xlrd>=2.0.1",
+    "s3fs>=2025.3.0",
+    "duckdb>=1.2.1",
 ]
 authors = [
   {name="Thomas Faria", email="thomas.faria@insee.fr"}
