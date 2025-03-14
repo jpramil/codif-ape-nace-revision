@@ -44,7 +44,7 @@ def encode_ambiguous(
 
     # Get data
     data, _ = get_ambiguous_data(fs, VAR_TO_KEEP, third, only_annotated=True)
-    data = data.iloc[:200]
+
     # Get prompts
     if prompts_from_file:
         prompts = load_prompts_from_file(URL_PROMPTS_RAG, fs)

@@ -44,7 +44,6 @@ def encode_ambiguous(
 
     # Get data
     data, mapping_ambiguous = get_ambiguous_data(fs, VAR_TO_KEEP, third, only_annotated=True)
-    data = data.iloc[:200]
 
     # Generate prompts
     prompts = generate_prompts_from_data(data, parser, mapping=mapping_ambiguous)
