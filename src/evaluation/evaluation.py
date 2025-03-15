@@ -12,7 +12,8 @@ def check_prompt_mapping(prompt, ground_truth_df: pd.DataFrame) -> Dict:
     if gt_filtered.empty:
         return {"liasse_numero": prompt.id, "mapping_ok": False, "position": None}
 
-    manual_code = gt_filtered["apet_manual"].values[0]
+    nace2025 = gt_filtered["apet_manual"].values[0]
+    manual_code = f"{nace2025[:2]}.{nace2025[2:]}"
 
     mapping_ok = manual_code in prompt.proposed_codes
     position = prompt.proposed_codes.index(manual_code) if mapping_ok else None

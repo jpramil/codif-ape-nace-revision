@@ -145,7 +145,7 @@ def load_prompts_from_file(url: str, fs) -> List[PromptData]:
     return [
         PromptData(
             id=row_id,
-            proposed_codes=proposed_codes,
+            proposed_codes=[f"{x[:2]}.{x[2:]}" for x in proposed_codes.tolist()],
             prompt=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt},
