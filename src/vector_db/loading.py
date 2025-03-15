@@ -4,7 +4,8 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient
 
-QDRANT_URL = "https://projet-ape-377568-0.user.lab.sspcloud.fr"
+from src.constants.vector_db import QDRANT_URL
+
 QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 
 

@@ -56,7 +56,6 @@ def encode_ambiguous(
         **MODEL_TO_ARGS.get(llm_name, {}),
         hf_overrides={"sliding_window": None},
     )
-    tokenizer = llm.get_tokenizer()
 
     sampling_params = SamplingParams(
         max_tokens=MAX_NEW_TOKEN,
@@ -72,9 +71,7 @@ def encode_ambiguous(
     with mlflow.start_run(run_name=run_name):
         outputs = llm.chat(batch_prompts, sampling_params=sampling_params)
         responses = [output.outputs[0].text for output in outputs]
-
-        # We only keep the logprobs for tokens corresponding to the NACE codes (supposed to be at index 21 to 27)
-        logprobs = [output.outputs[0].logprobs[21:27] for output in outputs]
+        logprobs = [output.outputs[0].logprobs for output in outputs]
 
         results = [
             process_response(
@@ -82,7 +79,6 @@ def encode_ambiguous(
                 prompt=prompt,
                 parser=parser,
                 logprobs=logprob,
-                tokenizer=tokenizer,
             )
             for response, prompt, logprob in zip(responses, prompts, logprobs)
         ]

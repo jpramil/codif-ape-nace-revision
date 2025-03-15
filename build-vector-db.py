@@ -7,10 +7,7 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_qdrant import QdrantVectorStore
 
 from src.constants.paths import URL_EXPLANATORY_NOTES, URL_MAPPING_TABLE
-from src.constants.vector_db import (
-    COLLECTION_NAME,
-    EMBEDDING_MODEL,
-)
+from src.constants.vector_db import COLLECTION_NAME, EMBEDDING_MODEL, QDRANT_URL
 from src.mappings.mappings import get_mapping, get_nace2025_from_mapping
 from src.utils.data import get_file_system, load_excel_from_fs
 from src.vector_db.parsing import create_content_vdb
@@ -51,13 +48,13 @@ def main(collection_name: str):
         emb_model,
         collection_name=collection_name,
         vector_name=EMBEDDING_MODEL,
-        url="projet-ape-qdrant.user.lab.sspcloud.fr",
+        url=QDRANT_URL,
         api_key=os.getenv("QDRANT_API_KEY"),
         port="443",
         https=True,
     )
 
-    logging.info("Qdrant DB has been created in collection '{collection_name}'.")
+    logging.info(f"Qdrant DB has been created in collection '{collection_name}'.")
 
 
 if __name__ == "__main__":
