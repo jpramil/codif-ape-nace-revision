@@ -1,6 +1,6 @@
 #!/bin/bash
 pip install uv
-uv pip install -r requirements.txt
+uv pip install -r pyproject.toml
 
 pre-commit install
 

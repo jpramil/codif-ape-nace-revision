@@ -68,9 +68,9 @@ spec:
             ./bash/fetch_model_s3.sh {{inputs.parameters.LLM_NAME}} $LOCAL_PATH
 
             if [ "{{inputs.parameters.METHOD}}" != "cag" ]; then
-              uv run encode-ambiguous-{{inputs.parameters.METHOD}}.py --experiment_name NACE2025_DATASET --llm_name {{inputs.parameters.LLM_NAME}} --prompts_from_file 1
+              uv run encode-ambiguous-{{inputs.parameters.METHOD}}.py --experiment_name NACE2025_DATASET2 --llm_name {{inputs.parameters.LLM_NAME}} --prompts_from_file 1
             else
-              uv run encode-ambiguous-{{inputs.parameters.METHOD}}.py --experiment_name NACE2025_DATASET --llm_name {{inputs.parameters.LLM_NAME}}
+              uv run encode-ambiguous-{{inputs.parameters.METHOD}}.py --experiment_name NACE2025_DATASET2 --llm_name {{inputs.parameters.LLM_NAME}}
             fi
         volumeMounts:
           - mountPath: /dev/shm
