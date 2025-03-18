@@ -19,12 +19,12 @@ from src.constants.llm import (
     TEMPERATURE,
 )
 from src.constants.paths import URL_PROMPTS_RAG, URL_SIRENE4_AMBIGUOUS_RAG, URL_SIRENE4_EXTRACTION
-from src.constants.vector_db import COLLECTION_NAME
+from src.constants.vector_db import COLLECTION_NAME, RERANKER_MODEL
 from src.evaluation.evaluation import calculate_accuracy, get_prompt_mapping
 from src.llm.prompting import generate_prompts_from_data, load_prompts_from_file
 from src.llm.response import RAGResponse, process_response
 from src.utils.data import get_ambiguous_data, get_file_system, get_ground_truth
-from src.vector_db.loading import get_vector_db
+from src.vector_db.loading import get_retriever
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -47,8 +47,8 @@ def encode_ambiguous(
     if prompts_from_file:
         prompts = load_prompts_from_file(URL_PROMPTS_RAG, fs)
     else:
-        vector_db = get_vector_db(COLLECTION_NAME)
-        prompts = generate_prompts_from_data(data, parser, retriever=vector_db)
+        retriever = get_retriever(COLLECTION_NAME, RERANKER_MODEL)
+        prompts = generate_prompts_from_data(data, parser, retriever=retriever)
 
     batch_prompts = [p.prompt for p in prompts]
 

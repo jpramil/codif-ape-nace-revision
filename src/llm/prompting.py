@@ -44,7 +44,7 @@ def format_docs(docs: list):
     str
         A formatted string containing the document content.
     """
-    return "\n\n".join([f"{doc[0].page_content}" for doc in docs])
+    return "\n\n".join([f"{doc.page_content}" for doc in docs])
 
 
 def extract_info(nace2025, paragraphs: list[str]):
@@ -69,16 +69,14 @@ def build_activity_description(row) -> str:
 
 
 def create_specific_prompt_rag(activity: str, parser: Any, retriever: Any) -> str:
-    retrieved_docs = retriever.similarity_search_with_relevance_scores(
-        query=f"query : {activity}", k=5, score_threshold=0.5
-    )
+    retrieved_docs = retriever.invoke(f"query : {activity}")
 
     prompt = CLASSIF_PROMPT_RAG.format(
         activity=activity,
         proposed_codes=format_docs(retrieved_docs),
         format_instructions=parser.get_format_instructions(),
     )
-    proposed_codes = [c[0].metadata["code"] for c in retrieved_docs]
+    proposed_codes = [c.metadata["code"] for c in retrieved_docs]
 
     return prompt, proposed_codes
 

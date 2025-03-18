@@ -64,7 +64,7 @@ LOCAL_PATH=~/.cache/huggingface/hub
 To create a searchable database of NACE 2025 codes:
 
 ```bash
-python build-vector-db.py
+uv run build-vector-db.py
 ```
 
 ### 🏷 2. Encode Business Activity Codes
@@ -72,13 +72,13 @@ python build-vector-db.py
 For **unambiguous** classification:
 
 ```bash
-python encode-univoque.py
+uv run encode-univoque.py
 ```
 
 For **ambiguous** classification using an LLM:
 
 ```bash
-python encode-multivoque.py --experiment_name NACE2025_DATASET --llm_name mistralai/Mistral-7B-Instruct
+uv run encode-multivoque.py --experiment_name NACE2025_DATASET --llm_name Ministral-8B-Instruct-2410
 ```
 
 ### 🔬 3. Evaluate Classification Strategies
@@ -86,7 +86,7 @@ python encode-multivoque.py --experiment_name NACE2025_DATASET --llm_name mistra
 Compare different classification models:
 
 ```bash
-python evaluate_strategies.py
+uv run evaluate_strategies.py
 ```
 
 ### 📊 4. Build the NACE 2025 Dataset
@@ -94,19 +94,11 @@ python evaluate_strategies.py
 Once all unique ambiguous cases have been recoded using the best strategy, you can rebuild the entire dataset with NACE 2025 labels:
 
 ```bash
-python build_nace2025_sirene4.py
+uv run build_nace2025_sirene4.py
 ```
 
----
-
 ## 📡 LLM Integration
-This repository leverages **Large Language Models (LLMs)** to assist in classifying business activities. The supported models include:
-
-- `Qwen/Qwen2.5-32B-Instruct`
-- `mistralai/Mistral-Small-Instruct-2409`
-- `hugging-quants/Meta-Llama-3.1-70B-Instruct-GPTQ-INT4`
-
-These models help improve classification accuracy for ambiguous business activity cases.
+This repository leverages **Large Language Models (LLMs)** to assist in classifying business activities. The supported models include are the one available on the SSPCloud platform. One can also use a model directly from HuggingFace.
 
 
 ## 🏗 Argo Workflows
