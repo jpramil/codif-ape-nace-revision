@@ -736,9 +736,9 @@ matplotlib-inline==0.1.7 \
 mdurl==0.1.2 \
     --hash=sha256:84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8 \
     --hash=sha256:bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba
-mistral-common==1.5.3 \
-    --hash=sha256:1e9cc740197a55f9bc20d44160ce9230d9fff399da2e781d91c2677011765eff \
-    --hash=sha256:918af99501282bdd14cc453d561fbce13ba1416654604b94bed22c6aaebbb819
+mistral-common==1.5.4 \
+    --hash=sha256:0af4124ab09d1409761e91ec61681476882d46f9418eea8908d39c01222e0f6b \
+    --hash=sha256:acef3367a4386d5dd3d9e23330348bbebe90a5cbd2fc5587d8a8d13d9893e537
 mlflow==2.20.4 \
     --hash=sha256:3c37e334ac8f2437a06695f3c2c81788eb69d5d33b66c9692a93726ffb3765ba \
     --hash=sha256:400eca8170626770dbfb68e348f3b21a1376e3551346961a73764bce624c5ff8
@@ -1626,7 +1626,7 @@ uvloop==0.21.0 ; platform_python_implementation != 'PyPy' and sys_platform != 'c
 virtualenv==20.29.3 \
     --hash=sha256:3e3d00f5807e83b234dfb6122bf37cfadf4be216c53a49ac059d02414f819170 \
     --hash=sha256:95e39403fcf3940ac45bc717597dba16110b74506131845d9b687d5e73d947ac
-vllm @ git+https://github.com/vllm-project/vllm.git@6eaf1e5c52d5e72a577ad03d378a28b39f0e849e
+vllm @ git+https://github.com/vllm-project/vllm.git@16e9064f84c193cc9a3e02fa0daa035f21e0ed9c
 waitress==3.0.2 ; sys_platform == 'win32' \
     --hash=sha256:682aaaf2af0c44ada4abfb70ded36393f0e307f4ab9456a215ce0020baefc31f \
     --hash=sha256:c56d67fd6e87c2ee598b76abdd4e96cfad1f24cacdea5078d382b1f9d7b5ed2e
@@ -1730,16 +1730,16 @@ wrapt==1.17.2 \
 xformers==0.0.29.post2 ; platform_machine == 'x86_64' and sys_platform == 'linux' \
     --hash=sha256:0d0eb14db56cf08ec3fb9cb36ed5e98de1303411571539ca4dc080c5861e2744 \
     --hash=sha256:6ca3d1a6db6f2abff25c1154adee96987f77f4dfd5141771805afa5fc13e9395
-xgrammar==0.1.15 ; platform_machine == 'aarch64' or platform_machine == 'x86_64' \
-    --hash=sha256:12453a7d052adef252890baee961425b252fe1a1af4b32412bfbcb88a26fd1d4 \
-    --hash=sha256:1a274c3a32642fe0ad32d8afa432152e46c20fdf0ebfc5867b872b6191becfa8 \
-    --hash=sha256:1af0d592da35e56ad071e093e701f6e3fde42f66f13180c09342211df3c392a7 \
-    --hash=sha256:2b8628b03a2861901f861fa5ac623f0a9a8ed0002461bbe8eb8f2b4826f6b627 \
-    --hash=sha256:620ad447147404ff329bcec55ee3b8fea98ca182cd2a303addb40697345a5a08 \
-    --hash=sha256:83833b113b35d8bfe1457e501bbaf88b9ff216e68f524747ace16e2eda8d365a \
-    --hash=sha256:aeca4b8237eb356439a16611e9f315c59427377939a6f661a66c6f6816304664 \
-    --hash=sha256:bf80a7f3015f3212f3969623aecee54feca31ccb1d327b6a2d5c7e3f40d214b9 \
-    --hash=sha256:ef8efcce45ad300d2540d8b86878f65e2f6adbec3bddac665baf67df211fb3ab
+xgrammar==0.1.16 ; platform_machine == 'aarch64' or platform_machine == 'x86_64' \
+    --hash=sha256:2301413a374f11add07843dfb49050f27beae89a4be7e0ffd454c08cf302412c \
+    --hash=sha256:2d75e6501f55368462b4d61ce0fb6a65c587782faa7319f48f49a8c444b4245f \
+    --hash=sha256:4ddd5128a82d0a9c800c03df25c610368ca630704ad20a6bb7a3629f24ced442 \
+    --hash=sha256:51565f8e6eb17fefe7ce90aa4598cf8216b4ee801a33d58d8439242d3d18cfa6 \
+    --hash=sha256:60967ad8435448c183ad911c9c5252e5cb0b032b37f86dcfc16cdd07c35954f6 \
+    --hash=sha256:854e2b23d0099c590cbc8bb83ab7de7d7ba3acb8aab65d64fa1436af0639f80c \
+    --hash=sha256:90fae6c9256753f9816aacddf8c37176eded8b4164024d28d6342ea4b9182ae9 \
+    --hash=sha256:97322341c29185b31482459325160dc2fb3eeb99bdf52cfeb57ae61a7e76c9d1 \
+    --hash=sha256:d3c4fbc944bc2c0529da3efe0c5accab20df6c99aef7adfd17e3d0fecd10a80a
 xlrd==2.0.1 \
     --hash=sha256:6a33ee89877bd9abc1158129f6e94be74e2679636b8a205b43b85206c3f0bbdd \
     --hash=sha256:f72f148f54442c6b056bf931dbc34f986fd0c3b0b6b5a58d013c9aef274d0c88

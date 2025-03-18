@@ -18,7 +18,7 @@ dependencies = [
     "pre-commit>=3.8.0",
     "ruff>=0.6.4",
     "transformers>=4.44.2",
-    "vllm @ git+https://github.com/vllm-project/vllm.git@main",
+    "vllm @ git+https://github.com/vllm-project/vllm.git@v0.8.0",
     "xlrd>=2.0.1",
     "s3fs>=2025.3.0",
     "duckdb>=1.2.1",

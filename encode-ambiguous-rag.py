@@ -16,9 +16,7 @@ from src.constants.llm import (
     LLM_MODEL,
     MAX_NEW_TOKEN,
     MODEL_TO_ARGS,
-    REP_PENALTY,
     TEMPERATURE,
-    TOP_P,
 )
 from src.constants.paths import URL_PROMPTS_RAG, URL_SIRENE4_AMBIGUOUS_RAG, URL_SIRENE4_EXTRACTION
 from src.constants.vector_db import COLLECTION_NAME
@@ -59,14 +57,11 @@ def encode_ambiguous(
     llm = LLM(
         model=local_path_model,
         **MODEL_TO_ARGS.get(llm_name, {}),
-        hf_overrides={"sliding_window": None},
     )
 
     sampling_params = SamplingParams(
         max_tokens=MAX_NEW_TOKEN,
         temperature=TEMPERATURE,
-        top_p=TOP_P,
-        repetition_penalty=REP_PENALTY,
         seed=2025,
         logprobs=1,
     )
@@ -123,8 +118,6 @@ def encode_ambiguous(
             {
                 "LLM_MODEL": llm_name,
                 "TEMPERATURE": TEMPERATURE,
-                "TOP_P": TOP_P,
-                "REP_PENALTY": REP_PENALTY,
                 "input_path": URL_SIRENE4_EXTRACTION,
                 "output_path": f"{URL_SIRENE4_AMBIGUOUS_RAG}/{'--'.join(llm_name.split('/'))}/part-{third if third else 0}--{date}.parquet",
                 "num_coded": results_df["codable"].sum(),

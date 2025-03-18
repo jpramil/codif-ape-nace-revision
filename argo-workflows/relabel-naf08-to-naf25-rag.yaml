@@ -106,3 +106,5 @@ spec:
             value: "1"
           - name: VLLM_USE_FLASHINFER_SAMPLER
             value: "0"
+          - name: TORCH_CUDA_ARCH_LIST
+            value: "9.0"
