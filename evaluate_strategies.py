@@ -1,3 +1,5 @@
+# Not UP-TO-DATE
+
 import pandas as pd
 import pyarrow.parquet as pq
 
@@ -114,7 +116,7 @@ ground_truth = ground_truth.loc[:, ["liasse_numero", "apet_manual", "mapping_ok"
 eval_df = merged_df.merge(ground_truth, on="liasse_numero", how="inner")
 
 accuracies_raw = {
-    f"accuracy_{model.replace("nace2025_", "")}_lvl_{i}": round(
+    f"accuracy_{model.replace('nace2025_', '')}_lvl_{i}": round(
         (eval_df["apet_manual"].str[:i] == eval_df[f"{model}"].str[:i]).mean() * 100,
         2,
     )
@@ -139,7 +141,7 @@ accuracies_codable = {
 }
 
 accuracies_raw_llm = {
-    f"accuracy_{model.replace("nace2025_", "")}_lvl_{i}": round(
+    f"accuracy_{model.replace('nace2025_', '')}_lvl_{i}": round(
         (
             eval_df[eval_df["mapping_ok"]]["apet_manual"].str[:i]
             == eval_df[eval_df["mapping_ok"]][f"{model}"].str[:i]

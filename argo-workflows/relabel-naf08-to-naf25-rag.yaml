@@ -14,12 +14,12 @@ spec:
     parameters:
       - name: params-conf-list
         value: '[
-          {"LLM_NAME": "mistralai/Ministral-8B-Instruct-2410", "METHOD": "rag"},
-          {"LLM_NAME": "mistralai/Mistral-Small-24B-Instruct-2501", "METHOD": "rag"},
+          {"LLM_NAME": "mistralai/Mistral-Small-3.1-24B-Instruct-2503", "METHOD": "rag"},
           {"LLM_NAME": "Qwen/Qwen2.5-32B-Instruct", "METHOD": "rag"},
-          {"LLM_NAME": "mistralai/Ministral-8B-Instruct-2410", "METHOD": "cag"},
-          {"LLM_NAME": "mistralai/Mistral-Small-24B-Instruct-2501", "METHOD": "cag"},
-          {"LLM_NAME": "Qwen/Qwen2.5-32B-Instruct", "METHOD": "cag"}
+          {"LLM_NAME": "google/gemma-3-27b-it", "METHOD": "rag"},
+          {"LLM_NAME": "mistralai/Mistral-Small-3.1-24B-Instruct-2503", "METHOD": "cag"},
+          {"LLM_NAME": "Qwen/Qwen2.5-32B-Instruct", "METHOD": "cag"},
+          {"LLM_NAME": "google/gemma-3-27b-it", "METHOD": "cag"}
           ]'
 
   templates:
@@ -62,7 +62,7 @@ spec:
             git clone https://github.com/InseeFrLab/codif-ape-nace-revision.git
             cd codif-ape-nace-revision/
             pip install uv
-            uv pip install -r requirements.txt
+            uv pip install -r pyproject.toml
 
             export MC_HOST_s3=https://$AWS_ACCESS_KEY_ID:$AWS_SECRET_ACCESS_KEY@$AWS_S3_ENDPOINT
             ./bash/fetch_model_s3.sh {{inputs.parameters.LLM_NAME}} $LOCAL_PATH
