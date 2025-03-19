@@ -58,4 +58,4 @@ def main(collection_name: str):
 
 
 if __name__ == "__main__":
-    main(collection_name=COLLECTION_NAME, api_key=os.getenv("QDRANT_API_KEY"))
+    main(collection_name=COLLECTION_NAME)
