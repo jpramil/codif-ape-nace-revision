@@ -409,8 +409,8 @@ requires-dist = [
     { name = "pre-commit", specifier = ">=3.8.0" },
     { name = "ruff", specifier = ">=0.6.4" },
     { name = "s3fs", specifier = ">=2025.3.0" },
-    { name = "transformers", git = "https://github.com/huggingface/transformers?rev=v4.49.0-Gemma-3" },
-    { name = "vllm", git = "https://github.com/vllm-project/vllm.git?rev=v0.8.0" },
+    { name = "transformers", git = "https://github.com/huggingface/transformers.git" },
+    { name = "vllm", specifier = ">=0.8.0" },
     { name = "xlrd", specifier = ">=2.0.1" },
 ]
 
@@ -3597,7 +3597,7 @@ wheels = [
 [[package]]
 name = "transformers"
 version = "4.50.0.dev0"
-source = { git = "https://github.com/huggingface/transformers?rev=v4.49.0-Gemma-3#0ebd6651acd32c982fee265b23243b89bdb89577" }
+source = { git = "https://github.com/huggingface/transformers.git#4fa91b1be5a26a5b21ab08b03f05246ab4345a18" }
 dependencies = [
     { name = "filelock" },
     { name = "huggingface-hub" },
@@ -3756,8 +3756,8 @@ wheels = [
 
 [[package]]
 name = "vllm"
-version = "0.8.0rc3.dev2+g16e9064f"
-source = { git = "https://github.com/vllm-project/vllm.git?rev=v0.8.0#16e9064f84c193cc9a3e02fa0daa035f21e0ed9c" }
+version = "0.8.0"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
     { name = "blake3" },
@@ -3807,6 +3807,10 @@ dependencies = [
     { name = "watchfiles" },
     { name = "xformers", marker = "platform_machine == 'x86_64' and sys_platform == 'linux'" },
     { name = "xgrammar", marker = "platform_machine == 'aarch64' or platform_machine == 'x86_64'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d2/27/73a54707964c5160067e253398cc328943e3ddbaa3099265ab593e6ec766/vllm-0.8.0.tar.gz", hash = "sha256:449e6651d30d6d5025d0d42499cf1a02d983915ef3b3670547db14a0431aa9bd", size = 6407594 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/15/77/7beca2061aadfdfd2d81411102e6445b459bcfedfc46671d4712de6a00fb/vllm-0.8.0-cp38-abi3-manylinux1_x86_64.whl", hash = "sha256:d3660eda448560b0ce6a1524466d7d36ec0024e772c9dbf562dbead980e7d480", size = 265290109 },
 ]
 
 [[package]]

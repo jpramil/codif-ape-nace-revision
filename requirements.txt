@@ -1586,7 +1586,7 @@ tqdm==4.67.1 \
 traitlets==5.14.3 \
     --hash=sha256:9ed0579d3502c94b4b3732ac120375cda96f923114522847de4b3bb98b96b6b7 \
     --hash=sha256:b74e89e397b1ed28cc831db7aea759ba6640cb3de13090ca145426688ff1ac4f
-transformers @ git+https://github.com/huggingface/transformers@0ebd6651acd32c982fee265b23243b89bdb89577
+transformers @ git+https://github.com/huggingface/transformers.git@4fa91b1be5a26a5b21ab08b03f05246ab4345a18
 triton==3.1.0 ; (platform_machine == 'x86_64' and platform_system == 'linux' and sys_platform == 'darwin') or (platform_machine == 'x86_64' and platform_system == 'linux' and sys_platform == 'win32')
 triton==3.2.0 ; (platform_machine == 'x86_64' and platform_system == 'linux' and sys_platform != 'darwin' and sys_platform != 'win32') or (platform_machine == 'x86_64' and sys_platform == 'linux') \
     --hash=sha256:8d9b215efc1c26fa7eefb9a157915c92d52e000d2bf83e5f69704047e63f125c \
@@ -1626,7 +1626,9 @@ uvloop==0.21.0 ; platform_python_implementation != 'PyPy' and sys_platform != 'c
 virtualenv==20.29.3 \
     --hash=sha256:3e3d00f5807e83b234dfb6122bf37cfadf4be216c53a49ac059d02414f819170 \
     --hash=sha256:95e39403fcf3940ac45bc717597dba16110b74506131845d9b687d5e73d947ac
-vllm @ git+https://github.com/vllm-project/vllm.git@16e9064f84c193cc9a3e02fa0daa035f21e0ed9c
+vllm==0.8.0 \
+    --hash=sha256:449e6651d30d6d5025d0d42499cf1a02d983915ef3b3670547db14a0431aa9bd \
+    --hash=sha256:d3660eda448560b0ce6a1524466d7d36ec0024e772c9dbf562dbead980e7d480
 waitress==3.0.2 ; sys_platform == 'win32' \
     --hash=sha256:682aaaf2af0c44ada4abfb70ded36393f0e307f4ab9456a215ce0020baefc31f \
     --hash=sha256:c56d67fd6e87c2ee598b76abdd4e96cfad1f24cacdea5078d382b1f9d7b5ed2e
