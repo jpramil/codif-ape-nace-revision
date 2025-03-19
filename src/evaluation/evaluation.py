@@ -7,19 +7,25 @@ def check_prompt_mapping(prompt, ground_truth_df: pd.DataFrame) -> Dict:
     """
     Determines if a proposed code exists in ground truth and finds its position.
     """
-    gt_filtered = ground_truth_df.loc[ground_truth_df["liasse_numero"] == prompt.id]
+    if isinstance(prompt, tuple):
+        id_, proposed_codes, _, _ = prompt
+    else:
+        id_ = prompt.id
+        proposed_codes = prompt.proposed_codes
+
+    gt_filtered = ground_truth_df.loc[ground_truth_df["liasse_numero"] == id_]
 
     if gt_filtered.empty:
-        return {"liasse_numero": prompt.id, "mapping_ok": False, "position": None}
+        return {"liasse_numero": id_, "mapping_ok": False, "position": None}
 
     nace2025 = gt_filtered["apet_manual"].values[0]
     manual_code = f"{nace2025[:2]}.{nace2025[2:]}"
 
-    mapping_ok = manual_code in prompt.proposed_codes
-    position = prompt.proposed_codes.index(manual_code) if mapping_ok else None
+    mapping_ok = manual_code in proposed_codes
+    position = proposed_codes.index(manual_code) if mapping_ok else None
 
     return {
-        "liasse_numero": prompt.id,
+        "liasse_numero": id_,
         "mapping_ok": mapping_ok,
         "position": position,
     }

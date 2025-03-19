@@ -9,9 +9,10 @@ from src.constants.vector_db import (
     COLLECTION_NAME,
     RERANKER_MODEL,
 )
+from src.evaluation.evaluation import get_prompt_mapping
 from src.llm.prompting import generate_prompt
 from src.llm.response import RAGResponse
-from src.utils.data import get_ambiguous_data, get_file_system
+from src.utils.data import get_ambiguous_data, get_file_system, get_ground_truth
 from src.vector_db.loading import get_retriever
 
 # Configure logging
@@ -37,7 +38,13 @@ def main(collection_name: str):
     )
     df.to_parquet(URL_PROMPTS_RAG, filesystem=fs)
 
-    logging.info(f"Prompts saved to {URL_PROMPTS_RAG}")
+    ground_truth = get_ground_truth()
+
+    prompt_mapping = get_prompt_mapping(prompts, ground_truth)
+
+    pct_mapping_ok = prompt_mapping["mapping_ok"].sum() / len(prompt_mapping) * 100
+
+    logging.info(f"Prompts saved to {URL_PROMPTS_RAG} with {pct_mapping_ok:.2f}% mapping ok")
 
 
 if __name__ == "__main__":
