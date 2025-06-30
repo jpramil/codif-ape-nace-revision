@@ -1,23 +1,37 @@
+import logging
 import os
 
 from langchain.retrievers import ContextualCompressionRetriever
 from langchain.retrievers.document_compressors import CrossEncoderReranker
 from langchain_community.cross_encoders import HuggingFaceCrossEncoder
 from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_openai import OpenAIEmbeddings
 from langchain_qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient
 
-from src.constants.vector_db import QDRANT_URL
+logger = logging.getLogger(__name__)
 
-QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
+
+def create_vector_db(docs, embedding_model: OpenAIEmbeddings, collection_name: str) -> QdrantVectorStore:
+    logger.info("🧠 Creating Qdrant vector DB with embeddings")
+    return QdrantVectorStore.from_documents(
+        docs,
+        embedding_model,
+        collection_name=collection_name,
+        vector_name=os.getenv("EMBEDDING_MODEL"),
+        url=os.getenv("QDRANT_URL"),
+        api_key=os.getenv("QDRANT_API_KEY"),
+        port="443",
+        https=True,
+    )
 
 
 def get_qdrant_client() -> QdrantClient:
     """Initialize and return the Qdrant client."""
     return QdrantClient(
-        url=QDRANT_URL,
-        api_key=QDRANT_API_KEY,
-        port=443,  # Use integer instead of string for better compatibility
+        url=os.getenv("QDRANT_URL"),
+        api_key=os.getenv("QDRANT_API_KEY"),
+        port=443,
         https=True,
     )
 
@@ -31,13 +45,13 @@ def get_embedding_model_name(client: QdrantClient, collection_name: str) -> str:
         raise RuntimeError(f"Error retrieving embedding model: {e}")
 
 
-def get_embedding_model(model_name: str) -> HuggingFaceEmbeddings:
-    """Initialize the HuggingFace embedding model."""
-    return HuggingFaceEmbeddings(
-        model_name=model_name,
-        model_kwargs={"device": "cuda"},
-        encode_kwargs={"normalize_embeddings": True},
-        show_progress=False,
+def get_embedding_model(model_name: str) -> OpenAIEmbeddings:
+    """Initialize the embedding model."""
+    return OpenAIEmbeddings(
+        model=model_name,
+        openai_api_base=os.getenv("URL_EMBEDDING_API"),
+        openai_api_key=os.getenv("OPENAI_API_KEY"),
+        tiktoken_enabled=False,
     )
 
 
@@ -59,8 +73,8 @@ def get_vector_db(collection_name: str) -> QdrantVectorStore:
         embedding=emb_model,
         collection_name=collection_name,
         vector_name=emb_model_name,
-        url=QDRANT_URL,
-        api_key=QDRANT_API_KEY,
+        url=os.getenv("QDRANT_URL"),
+        api_key=os.getenv("QDRANT_API_KEY"),
         port=443,
         https=True,
     )

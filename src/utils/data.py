@@ -6,13 +6,13 @@ import duckdb
 import pandas as pd
 import s3fs
 
-from src.constants.paths import (
+from constants.paths import (
     URL_EXPLANATORY_NOTES,
     URL_GROUND_TRUTH,
     URL_MAPPING_TABLE,
     URL_SIRENE4_EXTRACTION,
 )
-from src.mappings.mappings import get_mapping
+from mappings.mappings import get_mapping
 
 
 def get_file_system(token=None) -> s3fs.S3FileSystem:
@@ -98,9 +98,7 @@ def merge_dataframes(df_dict: dict, merge_on, var_to_keep, columns_to_rename=Non
 
         # Rename columns if specified
         if columns_to_rename:
-            rename_map = {
-                col: pattern.format(key=key) for col, pattern in columns_to_rename.items()
-            }
+            rename_map = {col: pattern.format(key=key) for col, pattern in columns_to_rename.items()}
             temp_df.rename(columns=rename_map, inplace=True)
 
         processed_dfs[key] = temp_df
@@ -159,9 +157,7 @@ def process_subset(data: pd.DataFrame, third: Optional[int]) -> pd.DataFrame:
     return data.iloc[start_idx:end_idx]
 
 
-def get_ambiguous_data(
-    fs, var_to_keep: List[str], third: bool, only_annotated: bool = False
-) -> pd.DataFrame:
+def get_ambiguous_data(fs, var_to_keep: List[str], third: bool, only_annotated: bool = False) -> pd.DataFrame:
     """
     Loads and processes data from multiple sources.
 
@@ -190,17 +186,13 @@ def get_ambiguous_data(
         raise ValueError("No ambiguous codes found in mapping.")
 
     # Construct SQL query
-    filter_columns_sql = ", ".join(
-        [v for v in var_to_keep if v not in {"liasse_numero", "apet_finale"}]
-    )
+    filter_columns_sql = ", ".join([v for v in var_to_keep if v not in {"liasse_numero", "apet_finale"}])
     selected_columns_sql = ", ".join(var_to_keep)
     ambiguous_codes = "', '".join([m.code.replace(".", "") for m in mapping_ambiguous])
 
     # Filter only annotated data if specified
     ground_truth_filter = (
-        f"AND liasse_numero IN (SELECT liasse_numero FROM read_parquet('{URL_GROUND_TRUTH}'))"
-        if only_annotated
-        else ""
+        f"AND liasse_numero IN (SELECT liasse_numero FROM read_parquet('{URL_GROUND_TRUTH}'))" if only_annotated else ""
     )
 
     query = f"""
