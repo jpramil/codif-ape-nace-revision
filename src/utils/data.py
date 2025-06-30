@@ -1,11 +1,12 @@
 import logging
 import os
-from typing import List, Optional
+from typing import Optional
 
 import duckdb
 import pandas as pd
 import s3fs
 
+from constants.data import VAR_TO_KEEP
 from constants.paths import (
     URL_EXPLANATORY_NOTES,
     URL_GROUND_TRUTH,
@@ -62,7 +63,7 @@ def get_file_system(token=None) -> s3fs.S3FileSystem:
     return s3fs.S3FileSystem(**options)
 
 
-def merge_dataframes(df_dict: dict, merge_on, var_to_keep, columns_to_rename=None, how="inner"):
+def merge_dataframes(df_dict: dict, merge_on, columns_to_rename=None, how="inner"):
     """
     Merge a dictionary of pandas DataFrames.
 
@@ -72,8 +73,6 @@ def merge_dataframes(df_dict: dict, merge_on, var_to_keep, columns_to_rename=Non
         Dictionary of pandas DataFrames to merge with their names
     merge_on : str or list
         Column(s) to merge on
-    var_to_keep : list
-        List of columns to keep from each DataFrame
     columns_to_rename : dict, optional
         Dictionary specifying which columns to rename with suffix for each DataFrame
         Example: {"nace2025": "nace2025_{key}", "codable": "codable_{key}"}
@@ -94,7 +93,7 @@ def merge_dataframes(df_dict: dict, merge_on, var_to_keep, columns_to_rename=Non
     # Process each DataFrame: select columns and rename as needed
     for key, df in df_dict.items():
         # Select columns to keep
-        temp_df = df[var_to_keep].copy()
+        temp_df = df[VAR_TO_KEEP].copy()
 
         # Rename columns if specified
         if columns_to_rename:
@@ -157,20 +156,18 @@ def process_subset(data: pd.DataFrame, third: Optional[int]) -> pd.DataFrame:
     return data.iloc[start_idx:end_idx]
 
 
-def get_ambiguous_data(fs, var_to_keep: List[str], third: bool, only_annotated: bool = False) -> pd.DataFrame:
+def get_ambiguous_data(third: bool, only_annotated: bool = False) -> pd.DataFrame:
     """
     Loads and processes data from multiple sources.
 
     Args:
-        fs: File system handler.
-        var_to_keep (List[str]): List of variables to retain.
         third (bool): Additional processing flag.
         only_annotated (bool): Flag to filter only annotated data.
 
     Returns:
         pd.DataFrame: Processed subset of data.
     """
-
+    fs = get_file_system()
     # Load mapping data
     try:
         table_corres = load_excel_from_fs(fs, URL_MAPPING_TABLE)
@@ -186,8 +183,8 @@ def get_ambiguous_data(fs, var_to_keep: List[str], third: bool, only_annotated: 
         raise ValueError("No ambiguous codes found in mapping.")
 
     # Construct SQL query
-    filter_columns_sql = ", ".join([v for v in var_to_keep if v not in {"liasse_numero", "apet_finale"}])
-    selected_columns_sql = ", ".join(var_to_keep)
+    filter_columns_sql = ", ".join([v for v in VAR_TO_KEEP if v not in {"liasse_numero", "apet_finale"}])
+    selected_columns_sql = ", ".join(VAR_TO_KEEP)
     ambiguous_codes = "', '".join([m.code.replace(".", "") for m in mapping_ambiguous])
 
     # Filter only annotated data if specified

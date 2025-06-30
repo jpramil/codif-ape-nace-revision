@@ -5,13 +5,13 @@ import pandas as pd
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain_qdrant import QdrantVectorStore
 
-from src.constants.prompting import (
+from constants.prompting import (
     CLASSIF_PROMPT_CAG,
     CLASSIF_PROMPT_RAG,
     SYS_PROMPT_CAG,
     SYS_PROMPT_RAG,
 )
-from src.llm.response import RAGResponse
+from llm.response import RAGResponse
 
 # TODO create a class instead of a namedtuple
 PromptData = namedtuple("PromptData", ["id", "proposed_codes", "prompt"])
@@ -19,10 +19,7 @@ PromptData = namedtuple("PromptData", ["id", "proposed_codes", "prompt"])
 
 def format_code25(codes: list, paragraphs=["include", "not_include", "notes"]):
     return "\n\n".join(
-        [
-            f"{nace2025.code}: {nace2025.label}\n{extract_info(nace2025, paragraphs=paragraphs)}"
-            for nace2025 in codes
-        ]
+        [f"{nace2025.code}: {nace2025.label}\n{extract_info(nace2025, paragraphs=paragraphs)}" for nace2025 in codes]
     )
 
 
@@ -48,11 +45,7 @@ def format_docs(docs: list):
 
 
 def extract_info(nace2025, paragraphs: list[str]):
-    info = [
-        getattr(nace2025, paragraph)
-        for paragraph in paragraphs
-        if getattr(nace2025, paragraph) is not None
-    ]
+    info = [getattr(nace2025, paragraph) for paragraph in paragraphs if getattr(nace2025, paragraph) is not None]
     return "\n\n".join(info) if info else ""
 
 
@@ -89,9 +82,7 @@ def create_specific_prompt_cag(activity: str, parser: Any, row: Any, mapping: An
     prompt = CLASSIF_PROMPT_CAG.format(
         activity=activity,
         nace08=format_code08([next((m for m in mapping if m.code == nace08))]),
-        proposed_codes=format_code25(
-            proposed_codes, paragraphs=["include", "not_include", "notes"]
-        ),
+        proposed_codes=format_code25(proposed_codes, paragraphs=["include", "not_include", "notes"]),
         format_instructions=parser.get_format_instructions(),
     )
     return prompt, [c.code for c in proposed_codes]
@@ -159,7 +150,4 @@ def generate_prompts_from_data(
     retriever: Optional[QdrantVectorStore] = None,
     mapping: Optional[Any] = None,
 ) -> List[PromptData]:
-    return [
-        create_prompt_data_obj(row, parser, retriever=retriever, mapping=mapping)
-        for row in data.itertuples()
-    ]
+    return [create_prompt_data_obj(row, parser, retriever=retriever, mapping=mapping) for row in data.itertuples()]
