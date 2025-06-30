@@ -31,7 +31,7 @@ It provides tools for **automated classification and evaluation of business acti
 Ensure you have **Python 3.12+** and **uv** or **pip** installed, then install the required dependencies:
 
 ```bash
-uv pip install -r requirements.txt
+uv sync
 ```
 
 or
@@ -64,7 +64,7 @@ LOCAL_PATH=~/.cache/huggingface/hub
 To create a searchable database of NACE 2025 codes:
 
 ```bash
-uv run build-vector-db.py
+uv run src/build_vector_db.py
 ```
 
 ### 🏷 2. Encode Business Activity Codes
@@ -72,13 +72,13 @@ uv run build-vector-db.py
 For **unambiguous** classification:
 
 ```bash
-uv run encode-univoque.py
+uv run src/encode_univoque.py
 ```
 
 For **ambiguous** classification using an LLM:
 
 ```bash
-uv run encode-multivoque.py --experiment_name NACE2025_DATASET --llm_name Ministral-8B-Instruct-2410
+uv run src/encode_multivoque.py --experiment_name NACE2025_DATASET --llm_name Ministral-8B-Instruct-2410
 ```
 
 ### 🔬 3. Evaluate Classification Strategies
@@ -86,7 +86,7 @@ uv run encode-multivoque.py --experiment_name NACE2025_DATASET --llm_name Minist
 Compare different classification models:
 
 ```bash
-uv run evaluate_strategies.py
+uv run src/evaluate_strategies.py
 ```
 
 ### 📊 4. Build the NACE 2025 Dataset
@@ -94,7 +94,7 @@ uv run evaluate_strategies.py
 Once all unique ambiguous cases have been recoded using the best strategy, you can rebuild the entire dataset with NACE 2025 labels:
 
 ```bash
-uv run build_nace2025_sirene4.py
+uv run src/build_nace2025_sirene4.py
 ```
 
 ## 📡 LLM Integration

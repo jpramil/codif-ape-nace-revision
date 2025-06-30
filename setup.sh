@@ -1,8 +1,6 @@
 #!/bin/bash
-pip install uv
-uv pip install -r pyproject.toml
-
-pre-commit install
+uv sync
+uv run pre-commit install
 
 export MODEL_NAME=mistralai/Ministral-8B-Instruct-2410
 export LOCAL_PATH=/home/onyxia/.cache/huggingface/hub
