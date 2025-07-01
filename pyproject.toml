@@ -16,6 +16,7 @@ dependencies = [
     "s3fs>=2025.3.2",
     "duckdb>=1.2.1",
     "langchain-huggingface>=0.3.0",
+    "langfuse>=3.0.8",
 ]
 authors = [
   {name="Thomas Faria", email="thomas.faria@insee.fr"}

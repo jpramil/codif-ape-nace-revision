@@ -52,6 +52,8 @@ def get_embedding_model(model_name: str) -> OpenAIEmbeddings:
         openai_api_base=os.getenv("URL_EMBEDDING_API"),
         openai_api_key=os.getenv("OPENAI_API_KEY"),
         tiktoken_enabled=False,
+        embedding_ctx_length=8192,
+        # check_embedding_ctx_length=False,
     )
 
 
@@ -68,7 +70,6 @@ def get_vector_db(collection_name: str) -> QdrantVectorStore:
     client = get_qdrant_client()
     emb_model_name = get_embedding_model_name(client, collection_name)
     emb_model = get_embedding_model(emb_model_name)
-
     return QdrantVectorStore.from_existing_collection(
         embedding=emb_model,
         collection_name=collection_name,
@@ -80,11 +81,13 @@ def get_vector_db(collection_name: str) -> QdrantVectorStore:
     )
 
 
-def get_retriever(collection_name: str, reranker_name: str):
+def get_retriever(collection_name: str, reranker_name: str = None):
     """Initialize the retriever from a vector database and a reranker."""
     vector_db = get_vector_db(collection_name)
-    reranker = get_reranker_model(reranker_name)
-    compressor = CrossEncoderReranker(model=reranker, top_n=5)
-    return ContextualCompressionRetriever(
-        base_compressor=compressor, base_retriever=vector_db.as_retriever(search_kwargs={"k": 35})
-    )
+    if reranker_name:
+        reranker = get_reranker_model(reranker_name)
+        compressor = CrossEncoderReranker(model=reranker, top_n=5)
+        return ContextualCompressionRetriever(
+            base_compressor=compressor, base_retriever=vector_db.as_retriever(search_kwargs={"k": 35})
+        )
+    return vector_db

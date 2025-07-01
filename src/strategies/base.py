@@ -36,3 +36,17 @@ class EncodeStrategy(ABC):
         """
         df["nace2025"] = df["nace2025"].str.replace(".", "", regex=False)
         return df
+
+    def _format_activity_description(self, row: Any) -> str:
+        """
+        Format the activity description from the row data.
+        """
+        activity = row.get("libelle").lower() if row.get("libelle").isupper() else row.get("libelle")
+
+        if row.get("activ_sec_agri_et"):
+            activity += f"\nPrécisions sur l'activité agricole : {row.get('activ_sec_agri_et').lower()}"
+
+        if row.get("activ_nat_lib_et"):
+            activity += f"\nAutre nature d'activité : {row.get('activ_nat_lib_et').lower()}"
+
+        return activity
