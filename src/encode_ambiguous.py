@@ -2,6 +2,7 @@ import argparse
 import asyncio
 import os
 
+import pandas as pd
 from langfuse.openai import AsyncOpenAI
 
 import config
@@ -12,7 +13,7 @@ from utils.data import get_ambiguous_data
 
 config.setup()
 llm_client = AsyncOpenAI(
-    base_url="https://vllm-generation.user.lab.sspcloud.fr/v1",  # "https://llm.lab.sspcloud.fr/api",
+    base_url="https://llm.lab.sspcloud.fr/api",  # "https://vllm-generation.user.lab.sspcloud.fr/v1",
     api_key=os.environ["OPENAI_API_KEY"],
 )
 
@@ -21,7 +22,7 @@ def run_encode(strategy_cls, experiment_name, run_name, llm_name, third):
     # strategy = strategy_cls()
     strategy = RAGStrategy(
         llm_client=llm_client,
-        generation_model="mistralai/Mistral-Small-24B-Instruct-2501",  # "gemma3:27b",
+        generation_model="gemma3:27b",  # "mistralai/Mistral-Small-24B-Instruct-2501",
     )
     # fs = get_file_system()
     third = 1
@@ -34,7 +35,10 @@ def run_encode(strategy_cls, experiment_name, run_name, llm_name, third):
 
     # results = await strategy.call_llm_batch(prompts)
     results = asyncio.run(strategy.call_llm_batch(prompts))
-    return results
+
+    df = pd.DataFrame.from_records([r.model_dump() if r else None for r in results])
+
+    return df
 
 
 if __name__ == "__main__":

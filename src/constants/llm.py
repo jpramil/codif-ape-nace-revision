@@ -19,7 +19,8 @@ MODEL_TO_ARGS = {
         "enforce_eager": True,
     },
     "google/gemma-3-27b-it": {
-        "gpu_memory_utilization": 1.0,
+        "max_model_len": 20000,
+        "gpu_memory_utilization": 0.95,
         "enable_chunked_prefill": True,
     },
 }

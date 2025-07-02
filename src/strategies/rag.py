@@ -1,16 +1,24 @@
+import asyncio
 import logging
+import os
 from typing import Dict, List, Optional
 
 import pandas as pd
 from langchain.schema import Document
 from langchain_core.output_parsers import PydanticOutputParser
 from langfuse import Langfuse
-from langfuse.openai import AsyncOpenAI
 from pydantic import BaseModel, Field
 from tqdm.asyncio import tqdm
+from vllm import LLM
+from vllm.sampling_params import SamplingParams
 
 from constants.paths import URL_SIRENE4_AMBIGUOUS_RAG
 from constants.vector_db import COLLECTION_NAME
+from src.constants.llm import (
+    MAX_NEW_TOKEN,
+    MODEL_TO_ARGS,
+    TEMPERATURE,
+)
 from vector_db.loading import get_retriever
 
 from .base import EncodeStrategy
@@ -34,16 +42,27 @@ class RAGResponse(BaseModel):
 class RAGStrategy(EncodeStrategy):
     def __init__(
         self,
-        llm_client: AsyncOpenAI,
         generation_model: str = "gemma3:27b",
         reranker_model: str = None,
+        max_concurrent: int = 5,
     ):
-        self.client = llm_client
         self.generation_model = generation_model
         self.reranker_model = reranker_model
         self.db = get_retriever(COLLECTION_NAME, self.reranker_model)
         self.prompt_template = Langfuse().get_prompt("rag-classifier", label="production")
         self.prompt_template_retriever = Langfuse().get_prompt("retriever", label="production")
+        self.semaphore = asyncio.Semaphore(max_concurrent)
+        self.llm = LLM(
+            model=f"{os.getenv('LOCAL_PATH')}/{self.generation_model}",
+            **MODEL_TO_ARGS.get(self.generation_model, {}),
+        )
+        self.sampling_params = SamplingParams(
+            max_tokens=MAX_NEW_TOKEN,
+            temperature=TEMPERATURE,
+            seed=2025,
+            logprobs=1,
+        )
+        # super().__init__(client=self.llm, generation_model=self.generation_model)
 
     @property
     def parser(self):
@@ -89,25 +108,52 @@ class RAGStrategy(EncodeStrategy):
         Returns:
             Optional[RAGResponse]: Parsed response from the LLM, containing whether the activity can be classified and the corresponding NACE2025 code if applicable.
         """
-        response = await self.client.beta.chat.completions.parse(
-            name="activity_classifier_rag",
-            model=self.generation_model,
-            messages=message,
-            response_format=RAGResponse,
-            temperature=0.1,
-        )
-        parsed = response.choices[0].message.parsed
-        return parsed
+        max_retries = 3
+        timeout_seconds = 10
+
+        for attempt in range(1, max_retries + 1):
+            try:
+                response = await asyncio.wait_for(
+                    self.client.beta.chat.completions.parse(
+                        name="activity_classifier_rag",
+                        model=self.generation_model,
+                        messages=message,
+                        response_format=RAGResponse,
+                        temperature=0.1,
+                    ),
+                    timeout=timeout_seconds,
+                )
+                parsed = response.choices[0].message.parsed
+                return parsed
+
+            except asyncio.TimeoutError:
+                logging.warning(f"LLM call timed out after {timeout_seconds}s (attempt {attempt}/{max_retries})")
+                if attempt < max_retries:
+                    # Exponential backoff: wait 1s, 2s, 4s
+                    await asyncio.sleep(2 ** (attempt - 1))
+                else:
+                    logging.error("LLM call failed after maximum retries.")
+                    return None
+
+            except Exception as e:
+                # Optional: catch other errors if you want
+                logging.error(f"LLM call failed with unexpected error: {e}")
+                return None
 
     async def call_llm_batch(self, messages: List[List[Dict]]) -> List[Optional[RAGResponse]]:
         """
-        Call the LLM to classify multiple activities based on the provided messages.
+        Call the LLM to classify multiple activities with concurrency control and retry.
 
         Args:
-            messages (List[List[Dict]]): List of message lists to send to the LLM, each containing the activity description and proposed codes.
+            messages (List[List[Dict]]): List of messages to send to the LLM.
 
         Returns:
-            List[Optional[RAGResponse]]: List of parsed responses from the LLM, each containing whether the activity can be classified and the corresponding NACE2025 code if applicable.
+            List[Optional[RAGResponse]]: List of responses.
         """
-        tasks = [self._call_llm(message) for message in messages]
+
+        async def sem_task(message):
+            async with self.semaphore:
+                return await self._call_llm(message)
+
+        tasks = [asyncio.create_task(sem_task(message)) for message in messages]
         return await tqdm.gather(*tasks)
