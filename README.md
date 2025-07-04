@@ -31,20 +31,14 @@ It provides tools for **automated classification and evaluation of business acti
 Ensure you have **Python 3.12** and **uv**:
 
 ```bash
-uv pip install -r requirements.txt
-```
-
-or
-
-```bash
-uv pip install -r pyproject.toml
+uv sync
 ```
 
 ### 🏗 Pre-commit Setup
 Set up linting and formatting checks using `pre-commit`:
 
 ```bash
-pre-commit install
+uv run pre-commit install
 ```
 
 ### Cache LLM model from S3 Bucket (Optionnal)
