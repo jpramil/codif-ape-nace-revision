@@ -21,8 +21,7 @@ llm_client = AsyncOpenAI(
 def run_encode(strategy_cls, experiment_name, run_name, llm_name, third):
     # strategy = strategy_cls()
     strategy = RAGStrategy(
-        llm_client=llm_client,
-        generation_model="gemma3:27b",  # "mistralai/Mistral-Small-24B-Instruct-2501",
+        generation_model="google/gemma-3-1b-it",
     )
     # fs = get_file_system()
     third = 1
