@@ -1,24 +1,24 @@
-import asyncio
 import logging
-import os
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
+import torch
 from langchain.schema import Document
 from langchain_core.output_parsers import PydanticOutputParser
 from langfuse import Langfuse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, TypeAdapter
 from tqdm.asyncio import tqdm
 from vllm import LLM
-from vllm.sampling_params import SamplingParams, GuidedDecodingParams
+from vllm.outputs import RequestOutput
+from vllm.sampling_params import GuidedDecodingParams, SamplingParams
 
-from constants.paths import URL_SIRENE4_AMBIGUOUS_RAG
-from constants.vector_db import COLLECTION_NAME
 from constants.llm import (
     MAX_NEW_TOKEN,
     MODEL_TO_ARGS,
     TEMPERATURE,
 )
+from constants.paths import URL_SIRENE4_AMBIGUOUS_RAG
+from constants.vector_db import COLLECTION_NAME
 from vector_db.loading import get_retriever
 
 from .base import EncodeStrategy
@@ -54,6 +54,7 @@ class RAGStrategy(EncodeStrategy):
             model=f"{self.generation_model}",  # {os.getenv('LOCAL_PATH')/}
             **MODEL_TO_ARGS.get(self.generation_model, {}),
         )
+        self.tokenizer = self.llm.get_tokenizer()
         self.sampling_params = SamplingParams(
             max_tokens=MAX_NEW_TOKEN,
             temperature=TEMPERATURE,
@@ -97,9 +98,59 @@ class RAGStrategy(EncodeStrategy):
         list_codes = ", ".join(f"'{doc.metadata['code']}'" for doc in docs)
         return proposed_codes, list_codes
 
-    async def _call_llm(self, messages: List[Dict]) -> Optional[RAGResponse]:
+    def _call_llm(self, messages: List[Dict]) -> Optional[RAGResponse]:
         outputs = self.llm.chat(messages, sampling_params=self.sampling_params)
-        responses = [output.outputs[0].text for output in outputs]
-        logprobs = [output.outputs[0].logprobs for output in outputs]
-        # TODO : Validate responses
-        return responses, logprobs
+        return outputs
+
+    # a mettre en super()
+    def _parse_content(self, response_format: BaseModel, content: str) -> BaseModel:
+        try:
+            return TypeAdapter(RAGResponse).validate_json(content)
+        except Exception:
+            return None
+
+    def _process_output(self, output: RequestOutput) -> List[RAGResponse]:
+        """
+        Process the outputs from the LLM and return a list of RAGResponse objects.
+        """
+        parsed = self._parse_content(RAGResponse, output.outputs[0].text)
+
+        # We get the tokenized predicted NACE2025 code
+        target_ids = self.tokenizer(parsed.nace2025).get("input_ids")
+
+        nace2025_logprobs = self.extract_sequence_logprobs(output.outputs[0].logprobs, target_ids)
+
+        score = torch.exp(nace2025_logprobs).mean().item()
+
+        return parsed, score
+
+    def extract_sequence_logprobs(self, logprobs: List[Dict[int, Any]], target_ids: List[int]) -> torch.Tensor:
+        """
+        Extracts logprobs for the exact target_ids sequence from the list of logprobs.
+
+        Args:
+            logprobs: List of dicts with {token_id: Logprob}.
+            target_ids: The exact sequence of token IDs you want to find.
+
+        Returns:
+            Tensor of logprobs for the matched sequence, or empty tensor if not found.
+        """
+
+        # Convert the list of logprobs to a list of token IDs
+        ids_sequence = [list(tok.keys())[0] if tok else None for tok in logprobs]
+
+        sequence_length = len(target_ids)
+
+        for i in range(len(ids_sequence) - sequence_length + 1):
+            window_ids = ids_sequence[i : i + sequence_length]
+
+            if window_ids == target_ids:
+                # Exact match found, extract corresponding logprobs
+                window_logprobs = []
+                for j in range(sequence_length):
+                    logprob_obj = list(logprobs[i + j].values())[0]
+                    window_logprobs.append(logprob_obj.logprob)
+                return torch.tensor(window_logprobs)
+
+        # If no match found, return empty or fill with -inf
+        return torch.full((sequence_length,), float("-inf"))

@@ -12,16 +12,12 @@ from strategies.rag import RAGStrategy
 from utils.data import get_ambiguous_data
 
 config.setup()
-llm_client = AsyncOpenAI(
-    base_url="https://llm.lab.sspcloud.fr/api",  # "https://vllm-generation.user.lab.sspcloud.fr/v1",
-    api_key=os.environ["OPENAI_API_KEY"],
-)
 
 
 def run_encode(strategy_cls, experiment_name, run_name, llm_name, third):
     # strategy = strategy_cls()
     strategy = RAGStrategy(
-        generation_model="google/gemma-3-1b-it",
+        generation_model="Qwen/Qwen2.5-0.5B",
     )
     # fs = get_file_system()
     third = 1
@@ -33,7 +29,7 @@ def run_encode(strategy_cls, experiment_name, run_name, llm_name, third):
     prompts = asyncio.run(strategy.get_prompts(data))
 
     # results = await strategy.call_llm_batch(prompts)
-    results = asyncio.run(strategy.call_llm_batch(prompts))
+    results = strategy._call_llm(prompts)
 
     df = pd.DataFrame.from_records([r.model_dump() if r else None for r in results])
 
