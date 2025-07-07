@@ -18,6 +18,7 @@ dependencies = [
     "langchain-huggingface>=0.3.0",
     "langfuse>=2.0.0",
     "vllm==0.8.5",
+    "flashinfer-python==0.2.2",
 ]
 authors = [
   {name="Thomas Faria", email="thomas.faria@insee.fr"}

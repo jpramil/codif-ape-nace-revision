@@ -1,12 +1,12 @@
 import logging
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
 import torch
 from langchain.schema import Document
-from langchain_core.output_parsers import PydanticOutputParser
 from langfuse import Langfuse
-from pydantic import BaseModel, Field, TypeAdapter
+from pydantic import BaseModel, Field, TypeAdapter, ValidationError
 from tqdm.asyncio import tqdm
 from vllm import LLM
 from vllm.outputs import RequestOutput
@@ -19,6 +19,7 @@ from constants.llm import (
 )
 from constants.paths import URL_SIRENE4_AMBIGUOUS_RAG
 from constants.vector_db import COLLECTION_NAME
+from utils.data import get_file_system
 from vector_db.loading import get_retriever
 
 from .base import EncodeStrategy
@@ -38,6 +39,11 @@ class RAGResponse(BaseModel):
         default=None,
     )
 
+    confidence: Optional[float] = Field(
+        description="""Confidence score for the NACE2025 code, based on log probabilities. Rounded to 2 decimal places maximum.""",
+        default=0.0,
+    )
+
 
 class RAGStrategy(EncodeStrategy):
     def __init__(
@@ -45,6 +51,8 @@ class RAGStrategy(EncodeStrategy):
         generation_model: str = "gemma3:27b",
         reranker_model: str = None,
     ):
+        self.fs = get_file_system()
+        self.response_format = RAGResponse
         self.generation_model = generation_model
         self.reranker_model = reranker_model
         self.db = get_retriever(COLLECTION_NAME, self.reranker_model)
@@ -60,13 +68,9 @@ class RAGStrategy(EncodeStrategy):
             temperature=TEMPERATURE,
             seed=2025,
             logprobs=1,
-            guided_decoding=GuidedDecodingParams(json=RAGResponse.model_json_schema()),
+            guided_decoding=GuidedDecodingParams(json=self.response_format.model_json_schema()),
         )
         # super().__init__(client=self.llm, generation_model=self.generation_model)
-
-    @property
-    def parser(self):
-        return PydanticOutputParser(pydantic_object=RAGResponse)
 
     async def get_prompts(self, data: pd.DataFrame):
         tasks = [self.create_prompt(row) for row in data.to_dict(orient="records")]
@@ -74,7 +78,15 @@ class RAGStrategy(EncodeStrategy):
 
     @property
     def output_path(self):
-        return URL_SIRENE4_AMBIGUOUS_RAG
+        date = datetime.now().strftime("%Y-%m-%d--%H:%M")
+        template = "{url_data}/{generation_model}/part-{i}-{third}--{date}.parquet"
+        return template.format(
+            url_data=URL_SIRENE4_AMBIGUOUS_RAG,
+            generation_model=self.generation_model,
+            date=date,
+            third="{third}",
+            i="{i}",
+        )
 
     def postprocess_results(self, df):
         pass
@@ -98,22 +110,25 @@ class RAGStrategy(EncodeStrategy):
         list_codes = ", ".join(f"'{doc.metadata['code']}'" for doc in docs)
         return proposed_codes, list_codes
 
-    def _call_llm(self, messages: List[Dict]) -> Optional[RAGResponse]:
+    def _call_llm(self, messages: List[Dict]) -> List[Optional[BaseModel]]:
         outputs = self.llm.chat(messages, sampling_params=self.sampling_params)
         return outputs
 
     # a mettre en super()
     def _parse_content(self, response_format: BaseModel, content: str) -> BaseModel:
         try:
-            return TypeAdapter(RAGResponse).validate_json(content)
-        except Exception:
+            return TypeAdapter(response_format).validate_json(content)
+        except ValidationError as e:
+            logger.error(f"Validation error: {e}")
             return None
 
-    def _process_output(self, output: RequestOutput) -> List[RAGResponse]:
+    def _process_output(self, output: RequestOutput, response_format: BaseModel) -> BaseModel:
         """
-        Process the outputs from the LLM and return a list of RAGResponse objects.
+        Process the outputs from the LLM and return a list of BaseModel objects.
         """
-        parsed = self._parse_content(RAGResponse, output.outputs[0].text)
+        parsed = self._parse_content(response_format, output.outputs[0].text)
+        if parsed is None:
+            return response_format(codable=False, nace2025=None, confidence=0.0)
 
         # We get the tokenized predicted NACE2025 code
         target_ids = self.tokenizer(parsed.nace2025).get("input_ids")
@@ -122,7 +137,9 @@ class RAGStrategy(EncodeStrategy):
 
         score = torch.exp(nace2025_logprobs).mean().item()
 
-        return parsed, score
+        # We set the confidence score based on the logprobs
+        parsed.confidence = score
+        return parsed
 
     def extract_sequence_logprobs(self, logprobs: List[Dict[int, Any]], target_ids: List[int]) -> torch.Tensor:
         """
@@ -154,3 +171,12 @@ class RAGStrategy(EncodeStrategy):
 
         # If no match found, return empty or fill with -inf
         return torch.full((sequence_length,), float("-inf"))
+
+    def process_outputs(self, outputs: List[RequestOutput]) -> pd.DataFrame:
+        """
+        Process the outputs from the LLM and return a DataFrame.
+        """
+        results = pd.DataFrame.from_records(
+            [self._process_output(output, self.response_format).model_dump() for output in outputs]
+        )
+        return super().postprocess_results(results)

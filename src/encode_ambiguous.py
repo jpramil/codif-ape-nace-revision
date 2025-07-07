@@ -2,38 +2,66 @@ import argparse
 import asyncio
 import os
 
-import pandas as pd
-from langfuse.openai import AsyncOpenAI
+import mlflow
 
 import config
 from constants.llm import LLM_MODEL, MODEL_TO_ARGS
+from constants.paths import URL_SIRENE4_EXTRACTION
+from evaluation.evaluator import Evaluator
 from strategies.cag import CAGStrategy
 from strategies.rag import RAGStrategy
 from utils.data import get_ambiguous_data
 
 config.setup()
 
+# third = 1
+# llm_name = "Qwen/Qwen2.5-0.5B"
+# STRATEGY_MAP = {
+#     "rag": RAGStrategy,
+#     "cag": CAGStrategy,
+# }
+# strategy_cls = STRATEGY_MAP["rag"]
 
-def run_encode(strategy_cls, experiment_name, run_name, llm_name, third):
-    # strategy = strategy_cls()
-    strategy = RAGStrategy(
-        generation_model="Qwen/Qwen2.5-0.5B",
+
+async def run_encode(strategy_cls, experiment_name, run_name, llm_name, third):
+    strategy = strategy_cls(
+        generation_model=llm_name,
     )
-    # fs = get_file_system()
-    third = 1
+
     data, _ = get_ambiguous_data(third, only_annotated=True)
 
-    data = data.head(10)
-
+    data = data.head(20)
     # prompts = await strategy.get_prompts(data)
     prompts = asyncio.run(strategy.get_prompts(data))
 
-    # results = await strategy.call_llm_batch(prompts)
-    results = strategy._call_llm(prompts)
+    mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI"))
+    mlflow.set_experiment(experiment_name)
+    with mlflow.start_run(run_name=run_name):
+        outputs = strategy._call_llm(prompts)
 
-    df = pd.DataFrame.from_records([r.model_dump() if r else None for r in results])
+        processed_outputs = strategy.process_outputs(outputs)
 
-    return df
+        results = data.merge(processed_outputs, left_index=True, right_index=True)
+
+        output_path = strategy.save_results(results, third)
+
+        metrics = Evaluator().evaluate(results, prompts)
+
+        # Log MLflow parameters and metrics
+        mlflow.log_params(
+            {
+                "LLM_MODEL": llm_name,
+                "TEMPERATURE": strategy.sampling_params.temperature,
+                "input_path": URL_SIRENE4_EXTRACTION,
+                "output_path": output_path,
+                "num_coded": results["codable"].sum(),
+                "num_not_coded": len(results) - results["codable"].sum(),
+                "pct_not_coded": round((len(results) - results["codable"].sum()) / len(results) * 100, 2),
+            }
+        )
+
+        for metric, value in metrics.items():
+            mlflow.log_metric(metric, value)
 
 
 if __name__ == "__main__":

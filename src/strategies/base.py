@@ -1,18 +1,15 @@
 from abc import ABC, abstractmethod
 from typing import Any, List
 
-from langchain_core.output_parsers import BaseOutputParser
+import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 
 class EncodeStrategy(ABC):
     """
     Abstract base class for your encoding strategies (RAG or CAG).
     """
-
-    @property
-    @abstractmethod
-    def parser(self) -> BaseOutputParser:
-        pass
 
     @abstractmethod
     def get_prompts(self, data: Any) -> List[Any]:
@@ -50,3 +47,19 @@ class EncodeStrategy(ABC):
             activity += f"\nAutre nature d'activité : {row.get('activ_nat_lib_et').lower()}"
 
         return activity
+
+    def save_results(self, df: pd.DataFrame, third: int):
+        """
+        Save the results to the specified output path.
+        """
+        output_path = self.output_path.format(third=f"{third}" if third else "", i="{i}")
+
+        pq.write_to_dataset(
+            pa.Table.from_pandas(df),
+            root_path="/".join(output_path.split("/")[:-1]),
+            partition_cols=["codable"],
+            basename_template=output_path.split("/")[-1],
+            existing_data_behavior="overwrite_or_ignore",
+            filesystem=self.fs,
+        )
+        return output_path.format(i=0)
