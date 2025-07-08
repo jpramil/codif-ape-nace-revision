@@ -6,7 +6,7 @@ import pandas as pd
 import torch
 from langchain.schema import Document
 from langfuse import Langfuse
-from pydantic import BaseModel, Field, TypeAdapter, ValidationError
+from pydantic import BaseModel, Field, TypeAdapter, ValidationError, model_validator
 from tqdm.asyncio import tqdm
 from vllm import LLM
 from vllm.outputs import RequestOutput
@@ -43,6 +43,12 @@ class RAGResponse(BaseModel):
         description="""Confidence score for the NACE2025 code, based on log probabilities. Rounded to 2 decimal places maximum.""",
         default=0.0,
     )
+
+    @model_validator(mode="after")
+    def check_nace2025_if_codable(self) -> BaseModel:
+        if self.codable and not self.nace2025:
+            raise ValueError("If codable=True, then nace2025 must not be None or empty.")
+        return self
 
 
 class RAGStrategy(EncodeStrategy):
