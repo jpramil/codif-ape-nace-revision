@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Optional
+from typing import Any, Optional
 
 import duckdb
 import pandas as pd
@@ -156,17 +156,7 @@ def process_subset(data: pd.DataFrame, third: Optional[int]) -> pd.DataFrame:
     return data.iloc[start_idx:end_idx]
 
 
-def get_ambiguous_data(third: bool, only_annotated: bool = False) -> pd.DataFrame:
-    """
-    Loads and processes data from multiple sources.
-
-    Args:
-        third (bool): Additional processing flag.
-        only_annotated (bool): Flag to filter only annotated data.
-
-    Returns:
-        pd.DataFrame: Processed subset of data.
-    """
+def fetch_mapping() -> Any:
     fs = get_file_system()
     # Load mapping data
     try:
@@ -182,10 +172,24 @@ def get_ambiguous_data(third: bool, only_annotated: bool = False) -> pd.DataFram
     if not mapping_ambiguous:
         raise ValueError("No ambiguous codes found in mapping.")
 
+    return mapping_ambiguous
+
+
+def get_ambiguous_data(mapping: Any, third: bool, only_annotated: bool = False) -> pd.DataFrame:
+    """
+    Loads and processes data from multiple sources.
+
+    Args:
+        third (bool): Additional processing flag.
+        only_annotated (bool): Flag to filter only annotated data.
+
+    Returns:
+        pd.DataFrame: Processed subset of data.
+    """
     # Construct SQL query
     filter_columns_sql = ", ".join([v for v in VAR_TO_KEEP if v not in {"liasse_numero", "apet_finale"}])
     selected_columns_sql = ", ".join(VAR_TO_KEEP)
-    ambiguous_codes = "', '".join([m.code.replace(".", "") for m in mapping_ambiguous])
+    ambiguous_codes = "', '".join([m.code.replace(".", "") for m in mapping])
 
     # Filter only annotated data if specified
     ground_truth_filter = (
@@ -214,7 +218,7 @@ def get_ambiguous_data(third: bool, only_annotated: bool = False) -> pd.DataFram
         raise RuntimeError(f"Error loading data from S3: {e}")
 
     # Process data subset
-    return process_subset(data, third), mapping_ambiguous
+    return process_subset(data, third)
 
 
 def get_ground_truth() -> pd.DataFrame:

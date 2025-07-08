@@ -19,7 +19,7 @@ from constants.llm import (
 )
 from constants.paths import URL_SIRENE4_AMBIGUOUS_RAG
 from constants.vector_db import COLLECTION_NAME
-from utils.data import get_file_system
+from utils.data import fetch_mapping, get_file_system
 from vector_db.loading import get_retriever
 
 from .base import EncodeStrategy
@@ -52,6 +52,7 @@ class RAGStrategy(EncodeStrategy):
         reranker_model: str = None,
     ):
         self.fs = get_file_system()
+        self.mapping = fetch_mapping()
         self.response_format = RAGResponse
         self.generation_model = generation_model
         self.reranker_model = reranker_model
