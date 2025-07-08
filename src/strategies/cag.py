@@ -85,14 +85,7 @@ class CAGStrategy(EncodeStrategy):
     @property
     def output_path(self):
         date = datetime.now().strftime("%Y-%m-%d--%H:%M")
-        template = "{url_data}/{generation_model}/part-{i}-{third}--{date}.parquet"
-        return template.format(
-            url_data=URL_SIRENE4_AMBIGUOUS_CAG,
-            generation_model=self.generation_model,
-            date=date,
-            third="{third}",
-            i="{i}",
-        )
+        return f"{URL_SIRENE4_AMBIGUOUS_CAG}/{self.generation_model}/part-{{i}}-{{third}}--{date}.parquet"
 
     def postprocess_results(self, df):
         # Apply the base postprocessing first
@@ -101,10 +94,9 @@ class CAGStrategy(EncodeStrategy):
         df["nace08_valid"] = df["nace08_valid"].fillna("undefined").astype(str)
         return df
 
-    async def create_prompt(self, row, top_k: int = 5) -> List[Dict]:
-        activity = super()._format_activity_description(row)
+    async def create_prompt(self, row: Dict[str, Any], top_k: int = 5) -> List[Dict]:
+        activity = self._format_activity_description(row)
         nace08 = f"{row.get('apet_finale')[:2]}.{row.get('apet_finale')[2:]}"
-
         nace_old, proposed_codes, list_codes = self._format_documents(nace08)
 
         return self.prompt_template.compile(
@@ -123,16 +115,11 @@ class CAGStrategy(EncodeStrategy):
         proposed_codes = self.format_code(nace2025_codes)
         return nace_old, proposed_codes, list_codes
 
-    def format_code(self, codes: list, paragraphs=["include", "not_include", "notes"]):
-        return "\n\n".join(
-            [
-                f"{nace2025.code}: {nace2025.label}\n{self.extract_info(nace2025, paragraphs=paragraphs)}"
-                for nace2025 in codes
-            ]
-        )
+    def format_code(self, codes: list) -> str:
+        return "\n\n".join([f"{c.code}: {c.label}\n{self.extract_info(c)}" for c in codes])
 
-    def extract_info(self, code, paragraphs: list[str]):
-        info = [getattr(code, paragraph) for paragraph in paragraphs if getattr(code, paragraph) is not None]
+    def extract_info(self, code) -> str:
+        info = [getattr(code, attr) for attr in ["include", "not_include", "notes"] if getattr(code, attr, None)]
         return "\n\n".join(info) if info else ""
 
     def _call_llm(self, messages: List[Dict]) -> List[Optional[BaseModel]]:
@@ -165,46 +152,3 @@ class CAGStrategy(EncodeStrategy):
         # We set the confidence score based on the logprobs
         parsed.confidence = score
         return parsed
-
-    def extract_sequence_logprobs(self, logprobs: List[Dict[int, Any]], target_ids: List[int]) -> torch.Tensor:
-        """
-        Extracts logprobs for the exact target_ids sequence from the list of logprobs.
-
-        Args:
-            logprobs: List of dicts with {token_id: Logprob}.
-            target_ids: The exact sequence of token IDs you want to find.
-
-        Returns:
-            Tensor of logprobs for the matched sequence, or empty tensor if not found.
-        """
-
-        # Convert the list of logprobs to a list of token IDs
-        ids_sequence = [list(tok.keys())[0] if tok else None for tok in logprobs]
-
-        sequence_length = len(target_ids)
-
-        for i in range(len(ids_sequence) - sequence_length + 1):
-            window_ids = ids_sequence[i : i + sequence_length]
-
-            if window_ids == target_ids:
-                # Exact match found, extract corresponding logprobs
-                window_logprobs = []
-                for j in range(sequence_length):
-                    logprob_obj = list(logprobs[i + j].values())[0]
-                    window_logprobs.append(logprob_obj.logprob)
-                return torch.tensor(window_logprobs)
-
-        # If no match found, return empty or fill with -inf
-        return torch.full((sequence_length,), float("-inf"))
-
-    def process_outputs(self, outputs: List[RequestOutput]) -> pd.DataFrame:
-        """
-        Process the outputs from the LLM and return a DataFrame.
-        """
-        results = pd.DataFrame.from_records(
-            [self._process_output(output, self.response_format).model_dump() for output in outputs]
-        )
-        results = super().postprocess_results(results)
-        results["nace08_valid"] = results["nace08_valid"].fillna("undefined").astype(str)
-
-        return results

@@ -3,13 +3,11 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
-import torch
 from langchain.schema import Document
 from langfuse import Langfuse
-from pydantic import BaseModel, Field, TypeAdapter, ValidationError, model_validator
+from pydantic import BaseModel, Field, model_validator
 from tqdm.asyncio import tqdm
 from vllm import LLM
-from vllm.outputs import RequestOutput
 from vllm.sampling_params import GuidedDecodingParams, SamplingParams
 
 from constants.llm import (
@@ -77,7 +75,6 @@ class RAGStrategy(EncodeStrategy):
             logprobs=1,
             guided_decoding=GuidedDecodingParams(json=self.response_format.model_json_schema()),
         )
-        # super().__init__(client=self.llm, generation_model=self.generation_model)
 
     async def get_prompts(self, data: pd.DataFrame):
         tasks = [self.create_prompt(row) for row in data.to_dict(orient="records")]
@@ -86,20 +83,11 @@ class RAGStrategy(EncodeStrategy):
     @property
     def output_path(self):
         date = datetime.now().strftime("%Y-%m-%d--%H:%M")
-        template = "{url_data}/{generation_model}/part-{i}-{third}--{date}.parquet"
-        return template.format(
-            url_data=URL_SIRENE4_AMBIGUOUS_RAG,
-            generation_model=self.generation_model,
-            date=date,
-            third="{third}",
-            i="{i}",
-        )
+        return f"{URL_SIRENE4_AMBIGUOUS_RAG}/{self.generation_model}/part-{{i}}-{{third}}--{date}.parquet"
 
-    def postprocess_results(self, df):
-        pass
-
-    async def create_prompt(self, row, top_k: int = 5) -> List[Dict]:
-        activity = super()._format_activity_description(row)
+    # TODO: implement a method that create prompt and saves it to s3 in parquet and load it back when specified
+    async def create_prompt(self, row: Dict[str, Any], top_k: int = 5) -> Dict:
+        activity = self._format_activity_description(row)
         query = self.prompt_template_retriever.compile(
             activity_description=activity,
         )
@@ -116,74 +104,3 @@ class RAGStrategy(EncodeStrategy):
         proposed_codes = "\n\n".join(f"========\n{doc.page_content}" for doc in docs)
         list_codes = ", ".join(f"'{doc.metadata['code']}'" for doc in docs)
         return proposed_codes, list_codes
-
-    def _call_llm(self, messages: List[Dict]) -> List[Optional[BaseModel]]:
-        outputs = self.llm.chat(messages, sampling_params=self.sampling_params)
-        return outputs
-
-    # a mettre en super()
-    def _parse_content(self, response_format: BaseModel, content: str) -> BaseModel:
-        try:
-            return TypeAdapter(response_format).validate_json(content)
-        except ValidationError as e:
-            logger.error(f"Validation error: {e}")
-            return None
-
-    def _process_output(self, output: RequestOutput, response_format: BaseModel) -> BaseModel:
-        """
-        Process the outputs from the LLM and return a list of BaseModel objects.
-        """
-        parsed = self._parse_content(response_format, output.outputs[0].text)
-        if parsed is None:
-            return response_format(codable=False, nace2025=None, confidence=0.0)
-
-        # We get the tokenized predicted NACE2025 code
-        target_ids = self.tokenizer(parsed.nace2025).get("input_ids")
-
-        nace2025_logprobs = self.extract_sequence_logprobs(output.outputs[0].logprobs, target_ids)
-
-        score = torch.exp(nace2025_logprobs).mean().item()
-
-        # We set the confidence score based on the logprobs
-        parsed.confidence = score
-        return parsed
-
-    def extract_sequence_logprobs(self, logprobs: List[Dict[int, Any]], target_ids: List[int]) -> torch.Tensor:
-        """
-        Extracts logprobs for the exact target_ids sequence from the list of logprobs.
-
-        Args:
-            logprobs: List of dicts with {token_id: Logprob}.
-            target_ids: The exact sequence of token IDs you want to find.
-
-        Returns:
-            Tensor of logprobs for the matched sequence, or empty tensor if not found.
-        """
-
-        # Convert the list of logprobs to a list of token IDs
-        ids_sequence = [list(tok.keys())[0] if tok else None for tok in logprobs]
-
-        sequence_length = len(target_ids)
-
-        for i in range(len(ids_sequence) - sequence_length + 1):
-            window_ids = ids_sequence[i : i + sequence_length]
-
-            if window_ids == target_ids:
-                # Exact match found, extract corresponding logprobs
-                window_logprobs = []
-                for j in range(sequence_length):
-                    logprob_obj = list(logprobs[i + j].values())[0]
-                    window_logprobs.append(logprob_obj.logprob)
-                return torch.tensor(window_logprobs)
-
-        # If no match found, return empty or fill with -inf
-        return torch.full((sequence_length,), float("-inf"))
-
-    def process_outputs(self, outputs: List[RequestOutput]) -> pd.DataFrame:
-        """
-        Process the outputs from the LLM and return a DataFrame.
-        """
-        results = pd.DataFrame.from_records(
-            [self._process_output(output, self.response_format).model_dump() for output in outputs]
-        )
-        return super().postprocess_results(results)
