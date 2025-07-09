@@ -7,7 +7,13 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import torch
 from pydantic import BaseModel, TypeAdapter, ValidationError
+from vllm import LLM
 from vllm.outputs import RequestOutput
+
+from constants.llm import (
+    MODEL_TO_ARGS,
+)
+from utils.data import fetch_mapping, get_file_system
 
 logger = logging.getLogger(__name__)
 
@@ -18,11 +24,18 @@ class EncodeStrategy(ABC):
     Provides common LLM handling and postprocessing hooks.
     """
 
-    def __init__(self):
-        self.fs = None  # Must be set in subclass
-        self.mapping = None  # Must be set in subclass
-        self.llm = None
-        self.tokenizer = None
+    def __init__(
+        self,
+        generation_model: str = "Qwen/Qwen2.5-0.5B",
+    ):
+        self.fs = get_file_system()
+        self.mapping = fetch_mapping()
+        self.generation_model = generation_model
+        self.llm = LLM(
+            model=f"{self.generation_model}",
+            **MODEL_TO_ARGS.get(self.generation_model, {}),
+        )
+        self.tokenizer = self.llm.get_tokenizer()
         self.response_format: Optional[BaseModel] = None
 
     @abstractmethod
@@ -40,7 +53,6 @@ class EncodeStrategy(ABC):
         """
         pass
 
-    @abstractmethod
     def postprocess_results(self, df):
         """
         Default postprocess: remove dots from 'nace2025'.
@@ -78,7 +90,7 @@ class EncodeStrategy(ABC):
 
         return activity
 
-    def _call_llm(self, messages: List[Dict], sampling_params: Any) -> List[RequestOutput]:
+    def call_llm(self, messages: List[List[Dict]], sampling_params: Any) -> List[RequestOutput]:
         return self.llm.chat(messages, sampling_params=sampling_params)
 
     def _parse_content(self, content: str) -> Optional[BaseModel]:

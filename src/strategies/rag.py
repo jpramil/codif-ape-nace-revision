@@ -7,17 +7,14 @@ from langchain.schema import Document
 from langfuse import Langfuse
 from pydantic import BaseModel, Field, model_validator
 from tqdm.asyncio import tqdm
-from vllm import LLM
 from vllm.sampling_params import GuidedDecodingParams, SamplingParams
 
 from constants.llm import (
     MAX_NEW_TOKEN,
-    MODEL_TO_ARGS,
     TEMPERATURE,
 )
 from constants.paths import URL_SIRENE4_AMBIGUOUS_RAG
 from constants.vector_db import COLLECTION_NAME
-from utils.data import fetch_mapping, get_file_system
 from vector_db.loading import get_retriever
 
 from .base import EncodeStrategy
@@ -52,22 +49,15 @@ class RAGResponse(BaseModel):
 class RAGStrategy(EncodeStrategy):
     def __init__(
         self,
-        generation_model: str = "gemma3:27b",
+        generation_model: str = "Qwen/Qwen2.5-0.5B",
         reranker_model: str = None,
     ):
-        self.fs = get_file_system()
-        self.mapping = fetch_mapping()
+        super().__init__(generation_model)
         self.response_format = RAGResponse
-        self.generation_model = generation_model
         self.reranker_model = reranker_model
         self.db = get_retriever(COLLECTION_NAME, self.reranker_model)
         self.prompt_template = Langfuse().get_prompt("rag-classifier", label="production")
         self.prompt_template_retriever = Langfuse().get_prompt("retriever", label="production")
-        self.llm = LLM(
-            model=f"{self.generation_model}",  # {os.getenv('LOCAL_PATH')/}
-            **MODEL_TO_ARGS.get(self.generation_model, {}),
-        )
-        self.tokenizer = self.llm.get_tokenizer()
         self.sampling_params = SamplingParams(
             max_tokens=MAX_NEW_TOKEN,
             temperature=TEMPERATURE,

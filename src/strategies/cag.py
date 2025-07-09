@@ -3,21 +3,16 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
-import torch
 from langfuse import Langfuse
-from pydantic import BaseModel, Field, TypeAdapter, ValidationError, model_validator
+from pydantic import BaseModel, Field, model_validator
 from tqdm.asyncio import tqdm
-from vllm import LLM
-from vllm.outputs import RequestOutput
 from vllm.sampling_params import GuidedDecodingParams, SamplingParams
 
 from constants.llm import (
     MAX_NEW_TOKEN,
-    MODEL_TO_ARGS,
     TEMPERATURE,
 )
 from constants.paths import URL_SIRENE4_AMBIGUOUS_CAG
-from utils.data import fetch_mapping, get_file_system
 
 from .base import EncodeStrategy
 
@@ -56,19 +51,12 @@ class CAGResponse(BaseModel):
 class CAGStrategy(EncodeStrategy):
     def __init__(
         self,
-        generation_model: str = "gemma3:27b",
+        generation_model: str = "Qwen/Qwen2.5-0.5B",
         reranker_model: str = None,
     ):
-        self.fs = get_file_system()
-        self.mapping = fetch_mapping()
+        super().__init__(generation_model)
         self.response_format = CAGResponse
-        self.generation_model = generation_model
         self.prompt_template = Langfuse().get_prompt("cag-classifier", label="production")
-        self.llm = LLM(
-            model=f"{self.generation_model}",  # {os.getenv('LOCAL_PATH')/}
-            **MODEL_TO_ARGS.get(self.generation_model, {}),
-        )
-        self.tokenizer = self.llm.get_tokenizer()
         self.sampling_params = SamplingParams(
             max_tokens=MAX_NEW_TOKEN,
             temperature=TEMPERATURE,
@@ -78,7 +66,7 @@ class CAGStrategy(EncodeStrategy):
         )
         # super().__init__(client=self.llm, generation_model=self.generation_model)
 
-    async def get_prompts(self, data: pd.DataFrame):
+    async def get_prompts(self, data: pd.DataFrame) -> List[List[Dict]]:
         tasks = [self.create_prompt(row) for row in data.to_dict(orient="records")]
         return await tqdm.gather(*tasks)
 
@@ -106,7 +94,7 @@ class CAGStrategy(EncodeStrategy):
             list_proposed_codes=list_codes,
         )
 
-    def _format_documents(self, nace08) -> (str, str):
+    def _format_documents(self, nace08: str) -> (str, str):
         nace2025_codes = next((m.naf2025 for m in self.mapping if m.code == nace08))
         nace08_code = next((m for m in self.mapping if m.code == nace08))
 
@@ -121,34 +109,3 @@ class CAGStrategy(EncodeStrategy):
     def extract_info(self, code) -> str:
         info = [getattr(code, attr) for attr in ["include", "not_include", "notes"] if getattr(code, attr, None)]
         return "\n\n".join(info) if info else ""
-
-    def _call_llm(self, messages: List[Dict]) -> List[Optional[BaseModel]]:
-        outputs = self.llm.chat(messages, sampling_params=self.sampling_params)
-        return outputs
-
-    # a mettre en super()
-    def _parse_content(self, response_format: BaseModel, content: str) -> BaseModel:
-        try:
-            return TypeAdapter(response_format).validate_json(content)
-        except ValidationError as e:
-            logger.error(f"Validation error: {e}")
-            return None
-
-    def _process_output(self, output: RequestOutput, response_format: BaseModel) -> BaseModel:
-        """
-        Process the outputs from the LLM and return a list of BaseModel objects.
-        """
-        parsed = self._parse_content(response_format, output.outputs[0].text)
-        if parsed is None or parsed.nace2025 is None:
-            return response_format(codable=False, nace2025=None, confidence=0.0)
-
-        # We get the tokenized predicted NACE2025 code
-        target_ids = self.tokenizer(parsed.nace2025).get("input_ids")
-
-        nace2025_logprobs = self.extract_sequence_logprobs(output.outputs[0].logprobs, target_ids)
-
-        score = torch.exp(nace2025_logprobs).mean().item()
-
-        # We set the confidence score based on the logprobs
-        parsed.confidence = score
-        return parsed

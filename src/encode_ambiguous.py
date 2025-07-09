@@ -37,7 +37,7 @@ async def run_encode(strategy_cls, experiment_name, run_name, llm_name, third):
     mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI"))
     mlflow.set_experiment(experiment_name)
     with mlflow.start_run(run_name=run_name):
-        outputs = strategy._call_llm(prompts)
+        outputs = strategy.call_llm(prompts, strategy.sampling_params)
 
         processed_outputs = strategy.process_outputs(outputs)
 
@@ -81,10 +81,12 @@ if __name__ == "__main__":
         "cag": CAGStrategy,
     }
 
-    run_encode(
-        STRATEGY_MAP[args.strategy],
-        args.experiment_name,
-        args.run_name,
-        args.llm_name,
-        args.third,
+    asyncio.run(
+        run_encode(
+            STRATEGY_MAP[args.strategy],
+            args.experiment_name,
+            args.run_name,
+            args.llm_name,
+            args.third,
+        )
     )
