@@ -43,3 +43,5 @@ default-groups = ["dev"]
 
 [tool.vulture]
 paths = ["src"]
+ignore_decorators = ["@model_validator"]
+min_confidence = 80
