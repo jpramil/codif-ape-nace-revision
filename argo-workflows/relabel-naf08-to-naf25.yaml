@@ -14,10 +14,10 @@ spec:
     parameters:
       - name: params-conf-list
         value: '[
-              {"LLM_NAME": "mistralai/Ministral-8B-Instruct-2410", "THIRD": 1},
-              {"LLM_NAME": "mistralai/Ministral-8B-Instruct-2410", "THIRD": 2},
-              {"LLM_NAME": "mistralai/Ministral-8B-Instruct-2410", "THIRD": 3}
-            ]'
+          {"LLM_NAME": "Qwen/Qwen3-0.6B", "THIRD": 1},
+          {"LLM_NAME": "Qwen/Qwen3-0.6B", "THIRD": 2},
+          {"LLM_NAME": "Qwen/Qwen3-0.6B", "THIRD": 3}
+          ]'
 
   templates:
     - name: main
@@ -28,20 +28,28 @@ spec:
             arguments:
               parameters:
                 - name: LLM_NAME
-                  value: '{{item.LLM_NAME}}'
+                  value: "{{item.LLM_NAME}}"
                 - name: THIRD
-                  value: '{{item.THIRD}}'
-            withParam: '{{workflow.parameters.params-conf-list}}'
+                  value: "{{item.THIRD}}"
+            withParam: "{{workflow.parameters.params-conf-list}}"
     - name: run-relabel
       inputs:
         parameters:
           - name: LLM_NAME
           - name: THIRD
-      nodeSelector:
-        nvidia.com/gpu.product: "NVIDIA-H100-PCIe"
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: nvidia.com/gpu.product
+                    operator: In
+                    values:
+                      - NVIDIA-H100-NVL
+                      - NVIDIA-H100-PCIe
       container:
-        image: inseefrlab/onyxia-vscode-pytorch:py3.12.6-gpu
-        imagePullPolicy: Always
+        image: inseefrlab/onyxia-vscode-pytorch:py3.12.11-gpu
+        imagePullPolicy: IfNotPresent
         resources:
           limits:
             nvidia.com/gpu: 1
@@ -50,19 +58,10 @@ spec:
           - |
             git clone https://github.com/InseeFrLab/codif-ape-nace-revision.git
             cd codif-ape-nace-revision/
-            pip install -r requirements.txt
-
-            if [ "{{inputs.parameters.LLM_NAME}}" == "Qwen/Qwen2.5-72B-Instruct-GPTQ-Int4" ] || [ "{{inputs.parameters.LLM_NAME}}" == "hugging-quants/Meta-Llama-3.1-70B-Instruct-GPTQ-INT4" ]; then
-              cd ..
-              git clone https://github.com/AutoGPTQ/AutoGPTQ
-              cd AutoGPTQ
-              pip install -e .
-              cd ../codif-ape-nace-revision/
-            fi
-
-            export MC_HOST_s3=https://$AWS_ACCESS_KEY_ID:$AWS_SECRET_ACCESS_KEY@$AWS_S3_ENDPOINT
-            huggingface-cli login --token $HF_TOKEN
-            python encode-multivoque.py --experiment_name NACE2025_DATASET --llm_name {{inputs.parameters.LLM_NAME}} --third {{inputs.parameters.THIRD}}
+            uv sync
+            uv run huggingface-cli login --token $HF_TOKEN
+            uv run huggingface-cli download {{inputs.parameters.LLM_NAME}}
+            uv run encode_ambiguous.py --strategy cag --experiment_name NACE2025_DATASET --llm_name {{inputs.parameters.LLM_NAME}} --third {{inputs.parameters.THIRD}}
         volumeMounts:
           - mountPath: /dev/shm
             name: dshm
@@ -91,3 +90,17 @@ spec:
             value: https://minio.lab.sspcloud.fr
           - name: MLFLOW_TRACKING_URI
             value: https://projet-ape-mlflow.user.lab.sspcloud.fr/
+          - name: LANGFUSE_HOST
+            value: https://langfuse.lab.sspcloud.fr
+          - name: QDRANT_URL
+            value: https://projet-ape-qdrant.user.lab.sspcloud.fr/
+          - name: COLLECTION_NAME
+            value: embeddings_qwen
+          - name: TORCH_CUDA_ARCH_LIST
+            value: "9.0"
+          - name: VLLM_USE_FLASHINFER_SAMPLER
+            value: "1"
+## TODO Mettre les variables suivantes en secret kubernetes :
+# QDRANT_API_KEY
+# LANGFUSE_PUBLIC_KEY
+# LANGFUSE_SECRET_KEY
