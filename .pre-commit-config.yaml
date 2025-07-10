@@ -5,7 +5,7 @@ repos:
   ## Ruff
   - repo: https://github.com/astral-sh/ruff-pre-commit
     # Ruff version.
-    rev: v0.9.9
+    rev: v0.12.2
     hooks:
       # Run the linter.
       - id: ruff
@@ -21,16 +21,22 @@ repos:
     ## UV
   - repo: https://github.com/astral-sh/uv-pre-commit
     # uv version.
-    rev: 0.6.6
+    rev: 0.7.20
     hooks:
       # Keep uv.lock file up to date
       - id: uv-lock
 
     ## Nbstripout
   - repo: https://github.com/kynan/nbstripout
-    rev: 0.7.1
+    rev: 0.8.1
     hooks:
       - id: nbstripout
+
+    ## Vulture
+  - repo: https://github.com/jendrikseipp/vulture
+    rev: v2.14
+    hooks:
+      - id: vulture
 
     ## Pre-commit
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -42,7 +48,7 @@ repos:
       - id: check-added-large-files
 
   - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: v3.1.0
+    rev: v4.0.0-alpha.8
     hooks:
       - id: prettier
         types_or: [yaml, json5]
