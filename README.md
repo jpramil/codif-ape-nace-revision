@@ -8,7 +8,7 @@
   - [🚀 Getting Started](#-getting-started)
     - [🛠 Installation](#-installation)
     - [🏗 Pre-commit Setup](#-pre-commit-setup)
-    - [Cache LLM model from S3 Bucket (Optionnal)](#cache-llm-model-from-s3-bucket-optionnal)
+    - [Cache LLM model](#cache-llm-model)
   - [📜 Running the Scripts](#-running-the-scripts)
     - [✅ 1. Build Vector Database (if you are in the RAG case)](#-1-build-vector-database-if-you-are-in-the-rag-case)
     - [🏷 2. Encode Business Activity Codes](#-2-encode-business-activity-codes)
@@ -17,6 +17,7 @@
   - [📡 LLM Integration](#-llm-integration)
   - [🏗 Argo Workflows](#-argo-workflows)
   - [📄 License](#-license)
+  - [TODO](#todo)
 
 
 ## 📖 Overview
@@ -44,17 +45,16 @@ uv pip install -r pyproject.toml
 Set up linting and formatting checks using `pre-commit`:
 
 ```bash
-pre-commit install
+uv run pre-commit autoupdate
+uv run pre-commit install
 ```
 
-### Cache LLM model from S3 Bucket (Optionnal)
-If you want to use a model available in the SSPCloud you can execute this command:
+### Cache LLM model
+Before running the script download the model and put it in cache using the huggingface CLI which is faster than vllm to download the model.
 
 ```bash
-MODEL_NAME=mistralai/Ministral-8B-Instruct-2410
-LOCAL_PATH=~/.cache/huggingface/hub
-
-./bash/fetch_model_s3.sh $MODEL_NAME $LOCAL_PATH
+export MODEL_NAME=Qwen/Qwen2.5-0.5B
+uv run huggingface-cli download $MODEL_NAME
 ```
 
 ## 📜 Running the Scripts
@@ -72,16 +72,18 @@ uv run src/build_vector_db.py
 For **unambiguous** classification:
 
 ```bash
-uv run src/encode_univoque.py
+uv run src/encode_unambiguous.py
 ```
 
 For **ambiguous** classification using an LLM:
 
 ```bash
-uv run src/encode_multivoque.py --experiment_name NACE2025_DATASET --llm_name Ministral-8B-Instruct-2410
+uv run src/encode_ambiguous.py --experiment_name NACE2025_DATASET --llm_name Qwen/Qwen3-0.6B
 ```
 
 ### 🔬 3. Evaluate Classification Strategies
+
+> ⚠️ **TO BE UPDATED**
 
 Compare different classification models:
 
@@ -98,7 +100,7 @@ uv run src/build_nace2025_sirene4.py
 ```
 
 ## 📡 LLM Integration
-This repository leverages **Large Language Models (LLMs)** to assist in classifying business activities. The supported models include are the one available on the SSPCloud platform. One can also use a model directly from HuggingFace.
+This repository leverages **Large Language Models (LLMs)** to assist in classifying business activities. One can also use all open source models available on HuggingFace and compatible with vLLM.
 
 
 ## 🏗 Argo Workflows
@@ -114,3 +116,13 @@ Or use the **Argo Workflow UI**.
 
 ## 📄 License
 This project is licensed under the **Apache License 2.0**. See the [LICENSE](LICENSE) file for details.
+
+
+## TODO
+
+faire les prompts en avance pour le rag (et cag pour avec qqlchose de similaire entre les deux classes)
+améliorer les embeddings (faut il garder les notes exlicatives en entier pour faire la similarity search ?)
+implementer le reranker (celui de qwen probablement)
+Mieux formatter les prompts au format MD
+Inclure des règles métiers dans les prompts (p.e. si 2 activités classer par rapport à la premiere)
+Inclure des règles code spécifique dans le cas du CAG. (Si LMNP alors on explique ce qui fait la distinction entre les deux code -- cf le fichier de @Nathan) --> Du coup inclure des variables annexes pour aider à départager certaines fois ?
