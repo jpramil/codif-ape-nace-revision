@@ -94,7 +94,7 @@ class CAGStrategy(EncodeStrategy):
             list_proposed_codes=list_codes,
         )
 
-    def _format_documents(self, nace08: str) -> (str, str):
+    def _format_documents(self, nace08: str) -> Tuple[str, str, str]:
         nace2025_codes = next((m.naf2025 for m in self.mapping if m.code == nace08))
         nace08_code = next((m for m in self.mapping if m.code == nace08))
 
