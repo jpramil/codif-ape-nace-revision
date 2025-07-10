@@ -4,7 +4,7 @@ import os
 
 def setup_langfuse():
     # Validate required environment variables
-    required_vars = ["LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY", "LANGFUSE_HOST", "OPENAI_API_KEY"]
+    required_vars = ["LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY", "LANGFUSE_HOST"]
     missing = [var for var in required_vars if not os.environ.get(var)]
     if missing:
         raise EnvironmentError(f"Missing required env vars: {', '.join(missing)}")

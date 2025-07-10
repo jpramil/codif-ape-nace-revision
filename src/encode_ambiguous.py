@@ -18,7 +18,7 @@ async def run_encode(strategy_cls, experiment_name, run_name, llm_name, third):
     strategy = strategy_cls(
         generation_model=llm_name,
     )
-    data = get_ambiguous_data(strategy.mapping, third, only_annotated=False)
+    data = get_ambiguous_data(strategy.mapping, third, only_annotated=True)
 
     prompts = await strategy.get_prompts(data)
 
