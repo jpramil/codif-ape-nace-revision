@@ -1,4 +1,3 @@
-LLM_MODEL = "Qwen/Qwen2.5-32B-Instruct"
 MAX_NEW_TOKEN = 100
 TEMPERATURE = 0.01
 

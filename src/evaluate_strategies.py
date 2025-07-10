@@ -54,20 +54,14 @@ for llm_name in MODEL_TO_USE.keys():
     )
     df_dict[llm_name] = (
         pq.ParquetDataset(
-            [
-                f
-                for f in dataset.files
-                if any(ts in f for ts in MODEL_TO_USE[llm_name]["date_version"])
-            ],
+            [f for f in dataset.files if any(ts in f for ts in MODEL_TO_USE[llm_name]["date_version"])],
             filesystem=fs,
         )
         .read()
         .to_pandas()
     )
 
-list_id = set.intersection(
-    *map(set, [df_dict[llm_name]["liasse_numero"].tolist() for llm_name in MODEL_TO_USE.keys()])
-)
+list_id = set.intersection(*map(set, [df_dict[llm_name]["liasse_numero"].tolist() for llm_name in MODEL_TO_USE.keys()]))
 df_dict = {
     llm_name: df_dict[llm_name]
     .loc[df_dict[llm_name]["liasse_numero"].isin(list_id)]
@@ -77,8 +71,8 @@ df_dict = {
 
 merged_df = merge_dataframes(
     df_dict,
-    merge_on="liasse_numero",  # your merge column
-    var_to_keep=VAR_TO_KEEP,  # your list of columns to keep
+    merge_on="liasse_numero",
+    var_to_keep=VAR_TO_KEEP,
     columns_to_rename={"nace2025": "nace2025_{key}", "codable": "codable_{key}"},
 )
 
@@ -87,13 +81,9 @@ weights = {f"nace2025_{model}": MODEL_TO_USE[model]["weights"] for model in df_d
 
 merged_df["nace2025_cascade_label"] = select_labels_cascade(merged_df, model_columns)
 merged_df["nace2025_voting_label"] = select_labels_voting(merged_df, model_columns)
-merged_df["nace2025_weighted_voting_label"] = select_labels_weighted_voting(
-    merged_df, model_columns, weights
-)
+merged_df["nace2025_weighted_voting_label"] = select_labels_weighted_voting(merged_df, model_columns, weights)
 
-ground_truth = (
-    pq.ParquetDataset(URL_GROUND_TRUTH.replace("s3://", ""), filesystem=fs).read().to_pandas()
-)
+ground_truth = pq.ParquetDataset(URL_GROUND_TRUTH.replace("s3://", ""), filesystem=fs).read().to_pandas()
 # TODO: TEMP REMOVE DUPLICATED
 ground_truth = ground_truth.drop_duplicates(subset="liasse_numero")
 
@@ -108,8 +98,7 @@ mapping = get_mapping(notes_ex, table_corres)
 
 naf08_to_naf2025 = {m.code: [c.code for c in m.naf2025] for m in mapping}
 ground_truth["mapping_ok"] = [
-    check_mapping(naf08, naf25)
-    for naf08, naf25 in zip(ground_truth["NAF2008_code"], ground_truth["apet_manual"])
+    check_mapping(naf08, naf25) for naf08, naf25 in zip(ground_truth["NAF2008_code"], ground_truth["apet_manual"])
 ]
 ground_truth = ground_truth.loc[:, ["liasse_numero", "apet_manual", "mapping_ok"]]
 
@@ -122,8 +111,7 @@ accuracies_raw = {
     )
     for i in [5, 4, 3, 2, 1]
     for model in [
-        f"nace2025_{x}"
-        for x in list(df_dict.keys()) + ["cascade_label", "voting_label", "weighted_voting_label"]
+        f"nace2025_{x}" for x in list(df_dict.keys()) + ["cascade_label", "voting_label", "weighted_voting_label"]
     ]
 }
 
@@ -143,16 +131,14 @@ accuracies_codable = {
 accuracies_raw_llm = {
     f"accuracy_{model.replace('nace2025_', '')}_lvl_{i}": round(
         (
-            eval_df[eval_df["mapping_ok"]]["apet_manual"].str[:i]
-            == eval_df[eval_df["mapping_ok"]][f"{model}"].str[:i]
+            eval_df[eval_df["mapping_ok"]]["apet_manual"].str[:i] == eval_df[eval_df["mapping_ok"]][f"{model}"].str[:i]
         ).mean()
         * 100,
         2,
     )
     for i in [5, 4, 3, 2, 1]
     for model in [
-        f"nace2025_{x}"
-        for x in list(df_dict.keys()) + ["cascade_label", "voting_label", "weighted_voting_label"]
+        f"nace2025_{x}" for x in list(df_dict.keys()) + ["cascade_label", "voting_label", "weighted_voting_label"]
     ]
 }
 
@@ -176,10 +162,6 @@ final_df = merged_df.loc[
         "liasse_numero",
         f"nace2025_{best_strategy[0].replace('accuracy_', '').replace('_lvl_5', '')}",
     ],
-].rename(
-    columns={
-        f"nace2025_{best_strategy[0].replace('accuracy_', '').replace('_lvl_5', '')}": "nace2025"
-    }
-)
+].rename(columns={f"nace2025_{best_strategy[0].replace('accuracy_', '').replace('_lvl_5', '')}": "nace2025"})
 
 final_df.to_parquet(URL_SIRENE4_AMBIGUOUS_FINAL, filesystem=fs)

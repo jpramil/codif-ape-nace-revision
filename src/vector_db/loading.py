@@ -50,7 +50,7 @@ def get_embedding_model(model_name: str) -> OpenAIEmbeddings:
     return OpenAIEmbeddings(
         model=model_name,
         openai_api_base=os.getenv("URL_EMBEDDING_API"),
-        openai_api_key=os.getenv("OPENAI_API_KEY"),
+        openai_api_key="PLACEHOLDER",
         tiktoken_enabled=False,
         embedding_ctx_length=8192,
         # check_embedding_ctx_length=False,

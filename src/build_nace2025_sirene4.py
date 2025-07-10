@@ -1,3 +1,5 @@
+# Not UP-TO-DATE
+
 import pandas as pd
 
 from src.constants.paths import (
@@ -49,9 +51,7 @@ data_sirene4 = data_sirene4.drop_duplicates(subset="liasse_numero")
 # On rajoute les variables annexes aux multivoques, univoques et ground truth contenant l'annotation nace2025
 data_univocal = data_univocal.merge(data_sirene4, on="liasse_numero", how="left")
 data_ambiguous = data_ambiguous.merge(data_sirene4, on="liasse_numero", how="left")
-data_ambiguous_ground_truth = data_ambiguous_ground_truth.merge(
-    data_sirene4, on="liasse_numero", how="left"
-)
+data_ambiguous_ground_truth = data_ambiguous_ground_truth.merge(data_sirene4, on="liasse_numero", how="left")
 
 # few lines are still duplicated, remove them before merge. Old Label Studio pipeline was not 100% perfect
 data_ambiguous_ground_truth = data_ambiguous_ground_truth.drop_duplicates(
@@ -63,9 +63,7 @@ data_sirene4_multivoque = data_sirene4.loc[
     ~data_sirene4["liasse_numero"].isin(data_univocal["liasse_numero"].tolist()), VAR_TO_KEEP
 ]
 data_ambiguous_resampled = (
-    data_ambiguous.merge(
-        data_sirene4_multivoque, on=[v for v in VAR_TO_KEEP if v != "liasse_numero"], how="left"
-    )
+    data_ambiguous.merge(data_sirene4_multivoque, on=[v for v in VAR_TO_KEEP if v != "liasse_numero"], how="left")
     .rename(columns={"liasse_numero_y": "liasse_numero"})
     .drop(columns=["liasse_numero_x"])
 )

@@ -1,4 +1,5 @@
 import logging
+import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -14,7 +15,6 @@ from constants.llm import (
     TEMPERATURE,
 )
 from constants.paths import URL_SIRENE4_AMBIGUOUS_RAG
-from constants.vector_db import COLLECTION_NAME
 from vector_db.loading import get_retriever
 
 from .base import EncodeStrategy
@@ -55,7 +55,7 @@ class RAGStrategy(EncodeStrategy):
         super().__init__(generation_model)
         self.response_format = RAGResponse
         self.reranker_model = reranker_model
-        self.db = get_retriever(COLLECTION_NAME, self.reranker_model)
+        self.db = get_retriever(os.getenv("COLLECTION_NAME"), self.reranker_model)
         self.prompt_template = Langfuse().get_prompt("rag-classifier", label="production")
         self.prompt_template_retriever = Langfuse().get_prompt("retriever", label="production")
         self.sampling_params = SamplingParams(
