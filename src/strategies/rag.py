@@ -1,7 +1,7 @@
 import logging
 import os
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 from langchain.schema import Document
@@ -90,7 +90,7 @@ class RAGStrategy(EncodeStrategy):
             list_proposed_codes=list_codes,
         )
 
-    def _format_documents(self, docs: List[Document]) -> (str, str):
+    def _format_documents(self, nace08: str) -> Tuple[str, str]:
         proposed_codes = "\n\n".join(f"========\n{doc.page_content}" for doc in docs)
         list_codes = ", ".join(f"'{doc.metadata['code']}'" for doc in docs)
         return proposed_codes, list_codes
