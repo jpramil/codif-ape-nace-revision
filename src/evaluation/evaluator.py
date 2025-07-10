@@ -54,20 +54,21 @@ class Evaluator:
 
         pattern = r"'([\d]{2}\.[\d]{2}[A-Z])'"
         mapping = []
-        for idx, row in enumerate(ground_truth.to_dict(orient="records")):
+        ground_truth_c = ground_truth.copy().reset_index(drop=True)
+        for idx, row in enumerate(ground_truth_c.to_dict(orient="records")):
             text = prompts[idx][1]["content"]
 
             # Retrieve the proposed code from the prompt
             proposed_codes = [c.replace(".", "") for c in re.findall(pattern, text)]
 
-            manual_code = ground_truth.loc[idx, "apet_manual"]
+            manual_code = ground_truth_c.loc[idx, "apet_manual"]
 
             mapping_ok = manual_code in proposed_codes
             position = proposed_codes.index(manual_code) if mapping_ok else None
 
             mapping.append(
                 {
-                    "liasse_numero": ground_truth.loc[idx, "liasse_numero"],
+                    "liasse_numero": ground_truth_c.loc[idx, "liasse_numero"],
                     "mapping_ok": mapping_ok,
                     "position": position,
                 }
