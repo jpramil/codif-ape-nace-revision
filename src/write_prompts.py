@@ -1,3 +1,6 @@
+# Not UP-TO-DATE
+# Implement a way to write prompts on S3 if desired in the stagregies classes instead of this script
+
 import logging
 
 import pandas as pd
@@ -33,9 +36,7 @@ def main(collection_name: str):
     prompts = [generate_prompt(row, parser, retriever=retriever) for row in data.itertuples()]
 
     # Save prompts
-    df = pd.DataFrame(
-        prompts, columns=["liasse_numero", "proposed_codes", "prompt", "system_prompt"]
-    )
+    df = pd.DataFrame(prompts, columns=["liasse_numero", "proposed_codes", "prompt", "system_prompt"])
     df.to_parquet(URL_PROMPTS_RAG, filesystem=fs)
 
     ground_truth = get_ground_truth()

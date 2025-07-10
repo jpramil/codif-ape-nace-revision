@@ -3,27 +3,7 @@ from typing import Dict, List
 
 import pandas as pd
 
-
-class NAF2008:
-    def __init__(self, code, label, naf2025=None):
-        self.code = code
-        self.label = label
-        self.naf2025 = naf2025 if naf2025 else []
-
-    def __repr__(self):
-        return f"NAF2008(code={self.code}, label={self.label}, naf2025={self.naf2025})"
-
-
-class NAF2025:
-    def __init__(self, code, label, include, not_include, notes=None):
-        self.code = code
-        self.label = label
-        self.include = include
-        self.not_include = not_include
-        self.notes = notes
-
-    def __repr__(self):
-        return f"NAF2025(code={self.code}, label={self.label}, include={self.include}, not_include={self.not_include}, notes={self.notes})"
+from .models import NAF2008, NAF2025
 
 
 def format_mapping_table(mapping_table: str) -> str:
@@ -132,16 +112,12 @@ def get_explanatory_notes(explanatory_notes: pd.DataFrame, code25: str, note_typ
     }
 
     if note_type not in note_mapping:
-        raise ValueError(
-            f"Invalid note_type '{note_type}'. Must be 'include', 'not_include', or 'notes'."
-        )
+        raise ValueError(f"Invalid note_type '{note_type}'. Must be 'include', 'not_include', or 'notes'.")
 
     # Extract the relevant fields for the note_type
     columns = note_mapping[note_type]
     extracted_values = [
-        unicodedata.normalize("NFKC", row[col])
-        for col in columns
-        if col in row and pd.notnull(row[col])
+        unicodedata.normalize("NFKC", row[col]) for col in columns if col in row and pd.notnull(row[col])
     ]
 
     # Combine relevant fields for 'include' or return the value for 'not_include' and 'notes'
@@ -163,9 +139,7 @@ def get_mapping(explanatory_notes: pd.DataFrame, mapping_table: pd.DataFrame) ->
                     code=row.naf25_niv5,
                     label=row.lib_naf25_niv5,
                     include=get_explanatory_notes(explanatory_notes, row.naf25_niv5, "include"),
-                    not_include=get_explanatory_notes(
-                        explanatory_notes, row.naf25_niv5, "not_include"
-                    ),
+                    not_include=get_explanatory_notes(explanatory_notes, row.naf25_niv5, "not_include"),
                     notes=get_explanatory_notes(explanatory_notes, row.naf25_niv5, "notes"),
                 )
                 for row in subset.itertuples()
