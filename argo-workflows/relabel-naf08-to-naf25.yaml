@@ -89,6 +89,21 @@ spec:
               secretKeyRef:
                 name: hf-token
                 key: token
+          - name: QDRANT_API_KEY
+            valueFrom:
+              secretKeyRef:
+                name: qdrant-apikey
+                key: api-key
+          - name: LANGFUSE_PUBLIC_KEY
+            valueFrom:
+              secretKeyRef:
+                name: langfuse-secrets
+                key: publicKey
+          - name: LANGFUSE_SECRET_KEY
+            valueFrom:
+              secretKeyRef:
+                name: langfuse-secrets
+                key: secretKey
           - name: MLFLOW_S3_ENDPOINT_URL
             value: https://minio.lab.sspcloud.fr
           - name: MLFLOW_TRACKING_URI
